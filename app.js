@@ -5,6 +5,7 @@
 const tg = window.Telegram?.WebApp;
 if (tg) { tg.ready(); tg.expand(); }
 
+// ─── State ───
 let state = {
   prices: {},
   portfolio: { usdt: 10000, holdings: {} },
@@ -26,7 +27,7 @@ const COINS = [
 
 const COIN_IDS = COINS.map(c => c.id).join(',');
 
-// ─── Fetch ───
+// ─── Fetch Prices ───
 async function fetchPrices() {
   try {
     const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${COIN_IDS}&vs_currencies=usd&include_24hr_change=true`);
@@ -37,33 +38,19 @@ async function fetchPrices() {
     renderMiniList();
     updatePortfolioValue();
   } catch {
-    document.getElementById('coinList').innerHTML = `<p class="empty-state">Failed to load. Retrying…</p>`;
+    const el = document.getElementById('coinList');
+    if (el) el.innerHTML = `<p class="empty-state">Failed to load. Retrying…</p>`;
   }
 }
 
-// ─── Render market ───
-function renderMarket(filter = '') {
-  const list = document.getElementById('coinList');
-  const filtered = state.allCoins.filter(c =>
-    c.name.toLowerCase().includes(filter.toLowerCase()) ||
-    c.symbol.toLowerCase().includes(filter.toLowerCase())
-  );
-  if (!filtered.length) { list.innerHTML = `<p class="empty-state">No results</p>`; return; }
-  list.innerHTML = filtered.map(c => coinItemHTML(c)).join('');
-}
-
-function renderMiniList() {
-  const list = document.getElementById('miniCoinList');
-  list.innerHTML = state.allCoins.slice(0, 4).map(c => coinItemHTML(c)).join('');
-}
-
-function coinItemHTML(coin) {
+// ─── Coin Item HTML ───
+function coinItemHTML(coin, onclick) {
   const p = state.prices[coin.id];
   if (!p) return '';
   const change = p.usd_24h_change?.toFixed(2);
   const isPos = change >= 0;
   return `
-    <div class="coin-item" onclick="openChart('${coin.id}')">
+    <div class="coin-item" onclick="${onclick}('${coin.id}')">
       <div class="coin-left">
         <div class="coin-icon">${coin.icon}</div>
         <div>
@@ -76,6 +63,171 @@ function coinItemHTML(coin) {
         <div class="coin-change ${isPos ? 'positive' : 'negative'}">${isPos ? '+' : ''}${change}%</div>
       </div>
     </div>`;
+}
+
+// ─── Render Market (click → chart) ───
+function renderMarket(filter = '') {
+  const list = document.getElementById('coinList');
+  if (!list) return;
+  const filtered = state.allCoins.filter(c =>
+    c.name.toLowerCase().includes(filter.toLowerCase()) ||
+    c.symbol.toLowerCase().includes(filter.toLowerCase())
+  );
+  if (!filtered.length) { list.innerHTML = `<p class="empty-state">No results</p>`; return; }
+  list.innerHTML = filtered.map(c => coinItemHTML(c, 'openChart')).join('');
+}
+
+// ─── Render Home Mini List (click → chart) ───
+function renderMiniList() {
+  const list = document.getElementById('miniCoinList');
+  if (!list) return;
+  list.innerHTML = state.allCoins.slice(0, 4).map(c => coinItemHTML(c, 'openChart')).join('');
+}
+
+// ─── Chart Module ───
+let chartInstance = null;
+let candleSeries = null;
+let currentChartCoin = null;
+let currentTf = 5;
+let chartSourcePage = 'market'; // to know where to go back
+
+const TF_DAYS = { 5: 1, 15: 1, 30: 2, 60: 7 };
+const TF_SEC  = { 5: 300, 15: 900, 30: 1800, 60: 3600 };
+
+async function openChart(coinId) {
+  currentChartCoin = coinId;
+  // remember which page launched chart
+  const active = document.querySelector('.page.active');
+  chartSourcePage = active ? active.id.replace('page-', '') : 'market';
+
+  const coin = COINS.find(c => c.id === coinId);
+  const p = state.prices[coinId];
+
+  document.getElementById('chartIcon').textContent = coin.icon;
+  document.getElementById('chartName').textContent = coin.name;
+  document.getElementById('chartPrice').textContent = p ? `$${formatPrice(p.usd)}` : '—';
+
+  const change = p?.usd_24h_change?.toFixed(2);
+  const badge = document.getElementById('chartChange');
+  badge.textContent = change !== undefined ? `${change >= 0 ? '+' : ''}${change}%` : '—';
+  badge.className = `chart-change-badge ${change >= 0 ? 'positive' : 'negative'}`;
+
+  // Reset timeframe UI
+  document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.tf-btn[data-tf="${currentTf}"]`)?.classList.add('active');
+
+  switchPage('chart');
+  await loadChart(coinId, currentTf);
+}
+
+async function loadChart(coinId, tf) {
+  const loader = document.getElementById('chartLoader');
+  const container = document.getElementById('chartContainer');
+
+  loader.classList.remove('hidden');
+
+  // Destroy old chart
+  if (chartInstance) { chartInstance.remove(); chartInstance = null; candleSeries = null; }
+
+  // Small delay so page is visible before heavy render
+  await new Promise(r => setTimeout(r, 80));
+
+  chartInstance = LightweightCharts.createChart(container, {
+    width: container.clientWidth,
+    height: 260,
+    layout: {
+      background: { type: 'solid', color: 'transparent' },
+      textColor: 'rgba(220,230,255,0.6)',
+      fontSize: 11,
+      fontFamily: "'DM Mono', monospace",
+    },
+    grid: {
+      vertLines: { color: 'rgba(255,255,255,0.05)' },
+      horzLines: { color: 'rgba(255,255,255,0.05)' },
+    },
+    crosshair: {
+      mode: LightweightCharts.CrosshairMode.Normal,
+      vertLine: { color: 'rgba(79,195,247,0.5)', width: 1, style: 1 },
+      horzLine: { color: 'rgba(79,195,247,0.5)', width: 1, style: 1 },
+    },
+    rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)' },
+    timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: true, secondsVisible: false },
+    handleScroll: true,
+    handleScale: true,
+  });
+
+  candleSeries = chartInstance.addCandlestickSeries({
+    upColor: '#00e5a0',
+    downColor: '#ff5252',
+    borderUpColor: '#00e5a0',
+    borderDownColor: '#ff5252',
+    wickUpColor: 'rgba(0,229,160,0.7)',
+    wickDownColor: 'rgba(255,82,82,0.7)',
+  });
+
+  let candles = [];
+  try {
+    const days = TF_DAYS[tf];
+    const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=minutely`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    candles = buildCandles(data.prices, TF_SEC[tf]);
+  } catch {
+    // Fallback to realistic demo candles
+    const basePrice = state.prices[coinId]?.usd || 1000;
+    candles = generateDemoCandles(basePrice, tf);
+  }
+
+  if (candles.length > 0) {
+    candleSeries.setData(candles);
+    chartInstance.timeScale().fitContent();
+  }
+
+  loader.classList.add('hidden');
+}
+
+function buildCandles(prices, bucketSec) {
+  if (!prices?.length) return [];
+  const map = {};
+  for (const [ts, price] of prices) {
+    const t = Math.floor(ts / 1000 / bucketSec) * bucketSec;
+    if (!map[t]) map[t] = { time: t, open: price, high: price, low: price, close: price };
+    else {
+      if (price > map[t].high) map[t].high = price;
+      if (price < map[t].low)  map[t].low  = price;
+      map[t].close = price;
+    }
+  }
+  return Object.values(map).sort((a, b) => a.time - b.time);
+}
+
+function generateDemoCandles(basePrice, tf) {
+  const candles = [];
+  const now = Math.floor(Date.now() / 1000);
+  const bucketSec = TF_SEC[tf];
+  const count = { 5: 120, 15: 96, 30: 96, 60: 120 }[tf] || 100;
+  let price = basePrice;
+  for (let i = count; i >= 0; i--) {
+    const t = now - i * bucketSec;
+    const vol = price * 0.008;
+    const open = price;
+    const close = price + (Math.random() - 0.48) * vol;
+    const high = Math.max(open, close) + Math.random() * vol * 0.4;
+    const low  = Math.min(open, close) - Math.random() * vol * 0.4;
+    candles.push({ time: t, open, high, low, close });
+    price = close;
+  }
+  return candles;
+}
+
+function goToTradeFromChart(mode) {
+  if (!currentChartCoin) return;
+  switchPage('trade');
+  document.getElementById('tradeCoin').value = currentChartCoin;
+  if (mode === 'sell') document.getElementById('sellBtn').click();
+  else document.getElementById('buyBtn').click();
+  updateTradeInfo();
 }
 
 // ─── Trade ───
@@ -119,9 +271,8 @@ function executeTrade() {
     state.portfolio.usdt -= amount;
     if (!state.portfolio.holdings[coinId]) state.portfolio.holdings[coinId] = { amount: 0, avgPrice: 0 };
     const h = state.portfolio.holdings[coinId];
-    const cost = h.amount * h.avgPrice + net;
+    h.avgPrice = (h.amount * h.avgPrice + net) / (h.amount + coinAmount);
     h.amount += coinAmount;
-    h.avgPrice = cost / h.amount;
     state.transactions.unshift({ type:'buy', coin:coin.symbol, coinName:coin.name, amount:coinAmount, usdValue:amount, price:p.usd });
     showToast(`Bought ${coinAmount.toFixed(6)} ${coin.symbol}`, 'success');
   } else {
@@ -177,7 +328,10 @@ function switchPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.add('active');
-  document.querySelector(`[data-page="${name}"]`)?.classList.add('active');
+  // Don't highlight any nav btn for chart page (it's a sub-page)
+  if (name !== 'chart') {
+    document.querySelector(`[data-page="${name}"]`)?.classList.add('active');
+  }
   if (name === 'wallet') renderWallet();
 }
 
@@ -195,18 +349,38 @@ function showToast(msg, type = 'success') {
   setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ─── Events ───
+// ─── Event Listeners ───
+
+// Bottom nav
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.addEventListener('click', () => switchPage(btn.dataset.page));
 });
 
+// Chart back button
+document.getElementById('chartBackBtn').addEventListener('click', () => {
+  switchPage(chartSourcePage);
+});
+
+// Timeframe buttons
+document.querySelectorAll('.tf-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentTf = parseInt(btn.dataset.tf);
+    if (currentChartCoin) loadChart(currentChartCoin, currentTf);
+  });
+});
+
+// Search
 document.getElementById('searchInput').addEventListener('input', e => renderMarket(e.target.value));
+
+// Trade
 document.getElementById('tradeCoin').addEventListener('change', updateTradeInfo);
 document.getElementById('tradeAmount').addEventListener('input', updateTradeInfo);
 
 document.getElementById('buyBtn').addEventListener('click', () => {
   state.tradeMode = 'buy';
-  document.getElementById('buyBtn').className = 'toggle-btn active buy-mode';
+  document.getElementById('buyBtn').className = 'toggle-btn buy-active';
   document.getElementById('sellBtn').className = 'toggle-btn';
   document.getElementById('tradeBtn').textContent = 'Place Buy Order';
   document.getElementById('tradeBtn').className = 'cta-btn buy-cta';
@@ -214,7 +388,7 @@ document.getElementById('buyBtn').addEventListener('click', () => {
 
 document.getElementById('sellBtn').addEventListener('click', () => {
   state.tradeMode = 'sell';
-  document.getElementById('sellBtn').className = 'toggle-btn active sell-mode';
+  document.getElementById('sellBtn').className = 'toggle-btn sell-active';
   document.getElementById('buyBtn').className = 'toggle-btn';
   document.getElementById('tradeBtn').textContent = 'Place Sell Order';
   document.getElementById('tradeBtn').className = 'cta-btn sell-cta';
@@ -229,169 +403,14 @@ document.querySelectorAll('.quick-chip').forEach(btn => {
   });
 });
 
-// ─── Init ───
-fetchPrices();
-setInterval(fetchPrices, 30000);
-
-// ============================================
-// CHART MODULE
-// ============================================
-
-let chartInstance = null;
-let candleSeries = null;
-let currentChartCoin = null;
-let currentTf = 5;
-
-// CoinGecko maps minutes → days param
-const TF_DAYS = { 5: 1, 15: 1, 30: 2, 60: 7 };
-// minutes in seconds for OHLC bucketing
-const TF_SEC  = { 5: 300, 15: 900, 30: 1800, 60: 3600 };
-
-async function openChart(coinId) {
-  currentChartCoin = coinId;
-  const coin = COINS.find(c => c.id === coinId);
-  const p = state.prices[coinId];
-
-  // Update header
-  document.getElementById('chartIcon').textContent = coin.icon;
-  document.getElementById('chartName').textContent = coin.name;
-  document.getElementById('chartPrice').textContent = p ? `$${formatPrice(p.usd)}` : '—';
-
-  const change = p?.usd_24h_change?.toFixed(2);
-  const badge = document.getElementById('chartChange');
-  badge.textContent = change ? `${change >= 0 ? '+' : ''}${change}%` : '—';
-  badge.className = `chart-change-badge ${change >= 0 ? 'positive' : 'negative'}`;
-
-  switchPage('chart');
-  await loadChart(coinId, currentTf);
-}
-
-async function loadChart(coinId, tf) {
-  const loader = document.getElementById('chartLoader');
-  loader.classList.remove('hidden');
-
-  // Init or clear chart
-  const container = document.getElementById('chartContainer');
-  if (chartInstance) { chartInstance.remove(); chartInstance = null; candleSeries = null; }
-
-  chartInstance = LightweightCharts.createChart(container, {
-    width: container.clientWidth,
-    height: 260,
-    layout: {
-      background: { type: 'solid', color: 'transparent' },
-      textColor: 'rgba(220,230,255,0.6)',
-      fontSize: 11,
-      fontFamily: "'DM Mono', monospace",
-    },
-    grid: {
-      vertLines: { color: 'rgba(255,255,255,0.05)' },
-      horzLines: { color: 'rgba(255,255,255,0.05)' },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-      vertLine: { color: 'rgba(79,195,247,0.4)', width: 1, style: 1 },
-      horzLine: { color: 'rgba(79,195,247,0.4)', width: 1, style: 1 },
-    },
-    rightPriceScale: {
-      borderColor: 'rgba(255,255,255,0.08)',
-      textColor: 'rgba(220,230,255,0.5)',
-    },
-    timeScale: {
-      borderColor: 'rgba(255,255,255,0.08)',
-      timeVisible: true,
-      secondsVisible: false,
-    },
-    handleScroll: true,
-    handleScale: true,
-  });
-
-  candleSeries = chartInstance.addCandlestickSeries({
-    upColor: '#00e5a0',
-    downColor: '#ff5252',
-    borderUpColor: '#00e5a0',
-    borderDownColor: '#ff5252',
-    wickUpColor: 'rgba(0,229,160,0.6)',
-    wickDownColor: 'rgba(255,82,82,0.6)',
-  });
-
-  try {
-    const days = TF_DAYS[tf];
-    const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=minutely`;
-    const res = await fetch(url);
-    const data = await res.json();
-
-    // Bucket raw minute data into tf-minute candles
-    const bucketSec = TF_SEC[tf];
-    const candles = buildCandles(data.prices, bucketSec);
-    candleSeries.setData(candles);
-    chartInstance.timeScale().fitContent();
-  } catch (e) {
-    // Fallback: generate realistic-looking demo candles
-    candleSeries.setData(generateDemoCandles(state.prices[coinId]?.usd || 1000, tf));
-    chartInstance.timeScale().fitContent();
-  }
-
-  loader.classList.add('hidden');
-}
-
-function buildCandles(prices, bucketSec) {
-  if (!prices || !prices.length) return [];
-  const map = {};
-  for (const [ts, price] of prices) {
-    const t = Math.floor(ts / 1000 / bucketSec) * bucketSec;
-    if (!map[t]) map[t] = { time: t, open: price, high: price, low: price, close: price };
-    else {
-      map[t].high = Math.max(map[t].high, price);
-      map[t].low  = Math.min(map[t].low,  price);
-      map[t].close = price;
-    }
-  }
-  return Object.values(map).sort((a,b) => a.time - b.time);
-}
-
-function generateDemoCandles(basePrice, tf) {
-  // Fallback realistic random candles
-  const candles = [];
-  const now = Math.floor(Date.now() / 1000);
-  const bucketSec = TF_SEC[tf];
-  const count = { 5: 120, 15: 96, 30: 96, 60: 168 }[tf] || 100;
-  let price = basePrice;
-  for (let i = count; i >= 0; i--) {
-    const t = now - i * bucketSec;
-    const vol = price * 0.008;
-    const open = price;
-    const close = price + (Math.random() - 0.48) * vol;
-    const high = Math.max(open, close) + Math.random() * vol * 0.5;
-    const low  = Math.min(open, close) - Math.random() * vol * 0.5;
-    candles.push({ time: t, open, high, low, close });
-    price = close;
-  }
-  return candles;
-}
-
-function goToTradeFromChart(mode) {
-  if (!currentChartCoin) return;
-  switchPage('trade');
-  document.getElementById('tradeCoin').value = currentChartCoin;
-  if (mode === 'sell') document.getElementById('sellBtn').click();
-  else document.getElementById('buyBtn').click();
-  updateTradeInfo();
-}
-
-// Timeframe buttons
-document.querySelectorAll('.tf-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentTf = parseInt(btn.dataset.tf);
-    if (currentChartCoin) loadChart(currentChartCoin, currentTf);
-  });
-});
-
-// Resize chart on window resize
+// Resize chart on orientation change
 window.addEventListener('resize', () => {
   if (chartInstance) {
     const c = document.getElementById('chartContainer');
     chartInstance.applyOptions({ width: c.clientWidth });
   }
 });
+
+// ─── Init ───
+fetchPrices();
+setInterval(fetchPrices, 30000);
