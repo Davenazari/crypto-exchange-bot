@@ -1,42 +1,38 @@
 // ============================================
-// CryptoX - Telegram Mini App
+// KolonoEX - Telegram Mini App
 // Demo Exchange using CoinGecko Free API
 // ============================================
 
-// Telegram WebApp init
 const tg = window.Telegram?.WebApp;
-if (tg) {
-  tg.ready();
-  tg.expand();
-}
+if (tg) { tg.ready(); tg.expand(); }
 
 // ---- State ----
 let state = {
   prices: {},
   portfolio: {
     usdt: 10000,
-    holdings: {} // { bitcoin: { amount: 0.5, avgPrice: 40000 } }
+    holdings: {}
   },
   transactions: [],
-  tradeMode: 'buy', // 'buy' or 'sell'
+  tradeMode: 'buy',
   allCoins: [],
 };
 
 // ---- Coin Config ----
 const COINS = [
-  { id: 'bitcoin',      symbol: 'BTC', name: 'بیت‌کوین',      icon: '₿' },
-  { id: 'ethereum',     symbol: 'ETH', name: 'اتریوم',         icon: 'Ξ' },
-  { id: 'tether',       symbol: 'USDT', name: 'تتر',           icon: '₮' },
-  { id: 'binancecoin',  symbol: 'BNB', name: 'بایننس کوین',    icon: '⬡' },
-  { id: 'solana',       symbol: 'SOL', name: 'سولانا',          icon: '◎' },
-  { id: 'ripple',       symbol: 'XRP', name: 'ریپل',           icon: '✕' },
-  { id: 'cardano',      symbol: 'ADA', name: 'کاردانو',        icon: '₳' },
-  { id: 'dogecoin',     symbol: 'DOGE', name: 'دوج‌کوین',      icon: 'Ð' },
+  { id: 'bitcoin',      symbol: 'BTC',  name: 'Bitcoin',       icon: '₿' },
+  { id: 'ethereum',     symbol: 'ETH',  name: 'Ethereum',      icon: 'Ξ' },
+  { id: 'tether',       symbol: 'USDT', name: 'Tether',        icon: '₮' },
+  { id: 'binancecoin',  symbol: 'BNB',  name: 'BNB',           icon: '⬡' },
+  { id: 'solana',       symbol: 'SOL',  name: 'Solana',        icon: '◎' },
+  { id: 'ripple',       symbol: 'XRP',  name: 'XRP',           icon: '✕' },
+  { id: 'cardano',      symbol: 'ADA',  name: 'Cardano',       icon: '₳' },
+  { id: 'dogecoin',     symbol: 'DOGE', name: 'Dogecoin',      icon: 'Ð' },
 ];
 
 const COIN_IDS = COINS.map(c => c.id).join(',');
 
-// ---- API ----
+// ---- Fetch Prices ----
 async function fetchPrices() {
   try {
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${COIN_IDS}&vs_currencies=usd&include_24hr_change=true`;
@@ -47,7 +43,7 @@ async function fetchPrices() {
     renderMarket();
     updatePortfolioValue();
   } catch (err) {
-    document.getElementById('coinList').innerHTML = `<p class="empty-state">خطا در دریافت قیمت‌ها. دوباره تلاش کن.</p>`;
+    document.getElementById('coinList').innerHTML = `<p class="empty-state">Failed to fetch prices. Please try again.</p>`;
   }
 }
 
@@ -55,11 +51,12 @@ async function fetchPrices() {
 function renderMarket(filter = '') {
   const list = document.getElementById('coinList');
   const filtered = state.allCoins.filter(c =>
-    c.name.includes(filter) || c.symbol.toLowerCase().includes(filter.toLowerCase()) || c.id.includes(filter.toLowerCase())
+    c.name.toLowerCase().includes(filter.toLowerCase()) ||
+    c.symbol.toLowerCase().includes(filter.toLowerCase())
   );
 
   if (!filtered.length) {
-    list.innerHTML = `<p class="empty-state">ارزی یافت نشد</p>`;
+    list.innerHTML = `<p class="empty-state">No coins found</p>`;
     return;
   }
 
@@ -90,7 +87,7 @@ function renderMarket(filter = '') {
   }).join('');
 }
 
-// ---- Trade Tab ----
+// ---- Trade ----
 function goToTrade(coinId) {
   switchTab('trade');
   document.getElementById('tradeCoin').value = coinId;
@@ -116,7 +113,7 @@ function updateTradeInfo() {
   const coin = COINS.find(c => c.id === coinId);
 
   document.getElementById('unitPrice').textContent = `$${formatPrice(price)}`;
-  document.getElementById('receiveAmount').textContent = `${receive.toFixed(6)} ${coin?.symbol || ''}`;
+  document.getElementById('receiveAmount').textContent = `${receive.toFixed(6)} ${coin?.symbol}`;
   document.getElementById('feeAmount').textContent = `$${fee.toFixed(4)}`;
 }
 
@@ -126,8 +123,8 @@ function executeTrade() {
   const priceData = state.prices[coinId];
   const coin = COINS.find(c => c.id === coinId);
 
-  if (!amount || amount <= 0) return showToast('مقدار را وارد کن', 'error');
-  if (!priceData) return showToast('قیمت در دسترس نیست', 'error');
+  if (!amount || amount <= 0) return showToast('Enter a valid amount', 'error');
+  if (!priceData) return showToast('Price unavailable', 'error');
 
   const price = priceData.usd;
   const fee = amount * 0.001;
@@ -135,35 +132,22 @@ function executeTrade() {
   const coinAmount = net / price;
 
   if (state.tradeMode === 'buy') {
-    if (amount > state.portfolio.usdt) return showToast('موجودی کافی نیست', 'error');
-
+    if (amount > state.portfolio.usdt) return showToast('Insufficient USDT balance', 'error');
     state.portfolio.usdt -= amount;
-    if (!state.portfolio.holdings[coinId]) {
-      state.portfolio.holdings[coinId] = { amount: 0, avgPrice: 0 };
-    }
+    if (!state.portfolio.holdings[coinId]) state.portfolio.holdings[coinId] = { amount: 0, avgPrice: 0 };
     const h = state.portfolio.holdings[coinId];
     const totalCost = h.amount * h.avgPrice + net;
     h.amount += coinAmount;
     h.avgPrice = totalCost / h.amount;
-
-    state.transactions.unshift({
-      type: 'buy', coin: coin.symbol, coinName: coin.name,
-      amount: coinAmount, usdValue: amount, price, date: new Date()
-    });
-    showToast(`خرید موفق! ${coinAmount.toFixed(6)} ${coin.symbol}`, 'success');
-
+    state.transactions.unshift({ type: 'buy', coin: coin.symbol, coinName: coin.name, amount: coinAmount, usdValue: amount, price, date: new Date() });
+    showToast(`Bought ${coinAmount.toFixed(6)} ${coin.symbol}`, 'success');
   } else {
     const holding = state.portfolio.holdings[coinId];
-    if (!holding || holding.amount < coinAmount) return showToast('دارایی کافی نیست', 'error');
-
+    if (!holding || holding.amount < coinAmount) return showToast('Insufficient asset balance', 'error');
     holding.amount -= coinAmount;
     state.portfolio.usdt += net;
-
-    state.transactions.unshift({
-      type: 'sell', coin: coin.symbol, coinName: coin.name,
-      amount: coinAmount, usdValue: net, price, date: new Date()
-    });
-    showToast(`فروش موفق! +$${net.toFixed(2)}`, 'success');
+    state.transactions.unshift({ type: 'sell', coin: coin.symbol, coinName: coin.name, amount: coinAmount, usdValue: net, price, date: new Date() });
+    showToast(`Sold ${coinAmount.toFixed(6)} ${coin.symbol} for $${net.toFixed(2)}`, 'success');
   }
 
   document.getElementById('tradeAmount').value = '';
@@ -176,115 +160,96 @@ function executeTrade() {
 function renderWallet() {
   document.getElementById('usdtBalance').textContent = `$${state.portfolio.usdt.toFixed(2)}`;
 
-  // Holdings
   const holdingsList = document.getElementById('holdingsList');
   const entries = Object.entries(state.portfolio.holdings).filter(([, h]) => h.amount > 0.000001);
 
-  if (!entries.length) {
-    holdingsList.innerHTML = `<p class="empty-state">هنوز هیچ ارزی خریداری نشده</p>`;
-  } else {
-    holdingsList.innerHTML = entries.map(([coinId, holding]) => {
-      const coin = COINS.find(c => c.id === coinId);
-      const currentPrice = state.prices[coinId]?.usd || 0;
-      const value = holding.amount * currentPrice;
-      return `
-        <div class="holding-item">
-          <div>
-            <div class="holding-name">${coin?.name || coinId}</div>
-            <div class="holding-amount">${holding.amount.toFixed(6)} ${coin?.symbol}</div>
+  holdingsList.innerHTML = !entries.length
+    ? `<p class="empty-state">No assets yet. Start trading!</p>`
+    : entries.map(([coinId, holding]) => {
+        const coin = COINS.find(c => c.id === coinId);
+        const value = holding.amount * (state.prices[coinId]?.usd || 0);
+        return `
+          <div class="holding-item">
+            <div>
+              <div class="holding-name">${coin?.name || coinId}</div>
+              <div class="holding-amount">${holding.amount.toFixed(6)} ${coin?.symbol}</div>
+            </div>
+            <div class="holding-value">$${value.toFixed(2)}</div>
           </div>
-          <div class="holding-value">$${value.toFixed(2)}</div>
-        </div>
-      `;
-    }).join('');
-  }
+        `;
+      }).join('');
 
-  // Transactions
   const txList = document.getElementById('txList');
-  if (!state.transactions.length) {
-    txList.innerHTML = `<p class="empty-state">تراکنشی وجود ندارد</p>`;
-  } else {
-    txList.innerHTML = state.transactions.slice(0, 20).map(tx => `
-      <div class="tx-item">
-        <div>
-          <span class="tx-type ${tx.type}">${tx.type === 'buy' ? 'خرید' : 'فروش'}</span>
-          <div class="tx-coin">${tx.coinName}</div>
+  txList.innerHTML = !state.transactions.length
+    ? `<p class="empty-state">No transactions yet</p>`
+    : state.transactions.slice(0, 20).map(tx => `
+        <div class="tx-item">
+          <div>
+            <span class="tx-type ${tx.type}">${tx.type.toUpperCase()}</span>
+            <div class="tx-coin">${tx.coinName}</div>
+          </div>
+          <div class="tx-amount">
+            ${tx.amount.toFixed(6)} ${tx.coin}<br>
+            <span style="color:var(--text2);font-size:11px">$${tx.usdValue.toFixed(2)}</span>
+          </div>
         </div>
-        <div class="tx-amount">
-          ${tx.amount.toFixed(6)} ${tx.coin}<br>
-          <span style="color: var(--text2); font-size:11px">$${tx.usdValue.toFixed(2)}</span>
-        </div>
-      </div>
-    `).join('');
-  }
+      `).join('');
 }
 
 function updatePortfolioValue() {
   let total = state.portfolio.usdt;
-  for (const [coinId, holding] of Object.entries(state.portfolio.holdings)) {
-    const price = state.prices[coinId]?.usd || 0;
-    total += holding.amount * price;
+  for (const [coinId, h] of Object.entries(state.portfolio.holdings)) {
+    total += h.amount * (state.prices[coinId]?.usd || 0);
   }
   document.getElementById('totalPortfolio').textContent = `$${total.toFixed(2)}`;
 }
 
-// ---- Tab Switching ----
-function switchTab(tabName) {
+// ---- Tabs ----
+function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-  document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-  document.getElementById(`tab-${tabName}`).classList.add('active');
-
-  if (tabName === 'wallet') renderWallet();
+  document.querySelector(`[data-tab="${name}"]`).classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+  if (name === 'wallet') renderWallet();
 }
 
 // ---- Helpers ----
-function formatPrice(price) {
-  if (price >= 1000) return price.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  if (price >= 1) return price.toFixed(4);
-  return price.toFixed(6);
+function formatPrice(p) {
+  if (p >= 1000) return p.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (p >= 1) return p.toFixed(4);
+  return p.toFixed(6);
 }
 
 function showToast(msg, type = 'success') {
-  const toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.className = `toast show ${type}`;
-  setTimeout(() => toast.classList.remove('show'), 3000);
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ---- Event Listeners ----
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
-});
-
-document.getElementById('searchInput').addEventListener('input', e => {
-  renderMarket(e.target.value);
-});
-
+// ---- Events ----
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => switchTab(tab.dataset.tab)));
+document.getElementById('searchInput').addEventListener('input', e => renderMarket(e.target.value));
 document.getElementById('tradeCoin').addEventListener('change', updateTradeInfo);
 document.getElementById('tradeAmount').addEventListener('input', updateTradeInfo);
 
 document.getElementById('buyBtn').addEventListener('click', () => {
   state.tradeMode = 'buy';
-  document.getElementById('buyBtn').classList.add('active');
-  document.getElementById('sellBtn').classList.remove('active');
-  document.getElementById('buyBtn').classList.remove('sell-active');
-  document.getElementById('tradeBtn').textContent = 'ثبت سفارش خرید';
+  document.getElementById('buyBtn').className = 'trade-type active';
+  document.getElementById('sellBtn').className = 'trade-type';
+  document.getElementById('tradeBtn').textContent = 'Place Buy Order';
   document.getElementById('tradeBtn').className = 'trade-btn buy';
 });
 
 document.getElementById('sellBtn').addEventListener('click', () => {
   state.tradeMode = 'sell';
-  document.getElementById('sellBtn').classList.add('active');
-  document.getElementById('sellBtn').classList.add('sell-active');
-  document.getElementById('buyBtn').classList.remove('active');
-  document.getElementById('tradeBtn').textContent = 'ثبت سفارش فروش';
+  document.getElementById('sellBtn').className = 'trade-type active sell-active';
+  document.getElementById('buyBtn').className = 'trade-type';
+  document.getElementById('tradeBtn').textContent = 'Place Sell Order';
   document.getElementById('tradeBtn').className = 'trade-btn sell';
 });
 
 document.getElementById('tradeBtn').addEventListener('click', executeTrade);
-
 document.querySelectorAll('.quick-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.getElementById('tradeAmount').value = btn.dataset.amount;
@@ -294,5 +259,4 @@ document.querySelectorAll('.quick-btn').forEach(btn => {
 
 // ---- Init ----
 fetchPrices();
-// Refresh prices every 30 seconds
 setInterval(fetchPrices, 30000);
