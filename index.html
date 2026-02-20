@@ -2,125 +2,173 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>KolonoEX</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+  <!-- Animated background blobs -->
+  <div class="bg-scene">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="blob blob-4"></div>
+    <div class="noise"></div>
+  </div>
+
   <div class="app">
 
-    <header class="header">
-      <div class="header-inner">
-        <div class="logo">
-          <span class="logo-icon">◈</span>
-          <span class="logo-text">KolonoEX</span>
-        </div>
-        <div class="portfolio-badge">
-          <span class="portfolio-label">Total Portfolio</span>
-          <span class="portfolio-value" id="totalPortfolio">$10,000.00</span>
-        </div>
+    <!-- Header -->
+    <header class="header glass-panel">
+      <div class="logo">
+        <div class="logo-gem">◈</div>
+        <span class="logo-text">KolonoEX</span>
+      </div>
+      <div class="portfolio-pill glass-pill">
+        <span class="pill-label">Portfolio</span>
+        <span class="pill-value" id="totalPortfolio">$10,000.00</span>
       </div>
     </header>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="market">Market</button>
-      <button class="tab" data-tab="trade">Trade</button>
-      <button class="tab" data-tab="wallet">Wallet</button>
+    <!-- Pages -->
+    <main class="pages">
+
+      <!-- Home Page -->
+      <section class="page active" id="page-home">
+        <div class="hero-card glass-card">
+          <div class="hero-label">Total Balance</div>
+          <div class="hero-amount" id="heroBalance">$10,000.00</div>
+          <div class="hero-sub">+$0.00 today</div>
+          <div class="hero-actions">
+            <button class="action-btn" onclick="switchPage('trade')">
+              <span class="action-icon">↑</span>
+              <span>Buy</span>
+            </button>
+            <button class="action-btn" onclick="switchPage('trade'); setTimeout(()=>document.getElementById('sellBtn').click(),100)">
+              <span class="action-icon">↓</span>
+              <span>Sell</span>
+            </button>
+            <button class="action-btn" onclick="switchPage('wallet')">
+              <span class="action-icon">◎</span>
+              <span>Wallet</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <span>Top Assets</span>
+          <button class="see-all" onclick="switchPage('market')">See all →</button>
+        </div>
+        <div class="mini-coin-list" id="miniCoinList">
+          <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+      </section>
+
+      <!-- Market Page -->
+      <section class="page" id="page-market">
+        <div class="page-header">
+          <h2>Market</h2>
+          <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+        </div>
+        <div class="search-wrap">
+          <input class="glass-input search-input" type="text" id="searchInput" placeholder="Search coins..." />
+        </div>
+        <div class="coin-list" id="coinList">
+          <div class="loading-state"><div class="spinner"></div><p>Loading prices...</p></div>
+        </div>
+      </section>
+
+      <!-- Trade Page -->
+      <section class="page" id="page-trade">
+        <div class="page-header">
+          <h2>Trade</h2>
+        </div>
+        <div class="glass-card trade-card">
+          <div class="trade-toggle">
+            <button class="toggle-btn active" id="buyBtn">Buy</button>
+            <button class="toggle-btn" id="sellBtn">Sell</button>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Asset</label>
+            <select id="tradeCoin" class="glass-input select-input">
+              <option value="bitcoin">Bitcoin (BTC)</option>
+              <option value="ethereum">Ethereum (ETH)</option>
+              <option value="tether">Tether (USDT)</option>
+              <option value="binancecoin">BNB (BNB)</option>
+              <option value="solana">Solana (SOL)</option>
+              <option value="ripple">XRP (XRP)</option>
+              <option value="cardano">Cardano (ADA)</option>
+              <option value="dogecoin">Dogecoin (DOGE)</option>
+            </select>
+          </div>
+
+          <div class="field-group">
+            <label class="field-label">Amount</label>
+            <div class="amount-wrap">
+              <input class="glass-input amount-input" type="number" id="tradeAmount" placeholder="0.00" />
+              <span class="amount-tag">USDT</span>
+            </div>
+            <div class="quick-row">
+              <button class="quick-chip" data-amount="100">$100</button>
+              <button class="quick-chip" data-amount="500">$500</button>
+              <button class="quick-chip" data-amount="1000">$1K</button>
+              <button class="quick-chip" data-amount="5000">$5K</button>
+            </div>
+          </div>
+
+          <div class="info-glass">
+            <div class="info-row"><span>Unit Price</span><span id="unitPrice" class="mono">—</span></div>
+            <div class="info-row"><span>You Receive</span><span id="receiveAmount" class="mono">—</span></div>
+            <div class="info-row"><span>Fee (0.1%)</span><span id="feeAmount" class="mono">—</span></div>
+          </div>
+
+          <button class="cta-btn buy-cta" id="tradeBtn">Place Buy Order</button>
+        </div>
+      </section>
+
+      <!-- Wallet Page -->
+      <section class="page" id="page-wallet">
+        <div class="page-header">
+          <h2>Wallet</h2>
+        </div>
+        <div class="balance-orb-wrap">
+          <div class="balance-orb glass-card">
+            <div class="orb-label">Available USDT</div>
+            <div class="orb-value" id="usdtBalance">$10,000.00</div>
+          </div>
+        </div>
+        <div class="section-title"><span>Holdings</span></div>
+        <div id="holdingsList"><p class="empty-state">No assets yet. Start trading!</p></div>
+        <div class="section-title" style="margin-top:20px"><span>History</span></div>
+        <div id="txList"><p class="empty-state">No transactions yet</p></div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav glass-panel">
+      <button class="nav-btn active" data-page="home">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span>Home</span>
+      </button>
+      <button class="nav-btn" data-page="market">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Market</span>
+      </button>
+      <button class="nav-btn" data-page="trade">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        <span>Trade</span>
+      </button>
+      <button class="nav-btn" data-page="wallet">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span>Wallet</span>
+      </button>
     </nav>
-
-    <!-- Market Tab -->
-    <section class="tab-content active" id="tab-market">
-      <div class="section-header">
-        <h2>Live Market</h2>
-        <span class="live-dot"></span>
-        <span class="live-label">LIVE</span>
-      </div>
-      <div class="search-bar">
-        <input type="text" placeholder="Search coins..." id="searchInput" />
-      </div>
-      <div class="coin-list" id="coinList">
-        <div class="loading-state">
-          <div class="spinner"></div>
-          <p>Fetching live prices...</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Trade Tab -->
-    <section class="tab-content" id="tab-trade">
-      <div class="trade-card">
-        <h2 class="trade-title">Buy / Sell</h2>
-
-        <div class="trade-toggle">
-          <button class="trade-type active" id="buyBtn">Buy</button>
-          <button class="trade-type" id="sellBtn">Sell</button>
-        </div>
-
-        <div class="form-group">
-          <label>Asset</label>
-          <select id="tradeCoin" class="select-input">
-            <option value="bitcoin">Bitcoin (BTC)</option>
-            <option value="ethereum">Ethereum (ETH)</option>
-            <option value="tether">Tether (USDT)</option>
-            <option value="binancecoin">BNB (BNB)</option>
-            <option value="solana">Solana (SOL)</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>Amount (USDT)</label>
-          <div class="amount-input-wrap">
-            <input type="number" id="tradeAmount" placeholder="0.00" class="amount-input" />
-            <span class="currency-badge">USDT</span>
-          </div>
-          <div class="quick-amounts">
-            <button class="quick-btn" data-amount="100">$100</button>
-            <button class="quick-btn" data-amount="500">$500</button>
-            <button class="quick-btn" data-amount="1000">$1K</button>
-            <button class="quick-btn" data-amount="5000">$5K</button>
-          </div>
-        </div>
-
-        <div class="trade-info-box">
-          <div class="info-row">
-            <span>Unit Price</span>
-            <span id="unitPrice">-</span>
-          </div>
-          <div class="info-row">
-            <span>You Receive</span>
-            <span id="receiveAmount">-</span>
-          </div>
-          <div class="info-row">
-            <span>Fee (0.1%)</span>
-            <span id="feeAmount">-</span>
-          </div>
-        </div>
-
-        <button class="trade-btn buy" id="tradeBtn">Place Buy Order</button>
-      </div>
-    </section>
-
-    <!-- Wallet Tab -->
-    <section class="tab-content" id="tab-wallet">
-      <div class="wallet-header">
-        <div class="balance-circle">
-          <span class="balance-label">Available USDT</span>
-          <span class="balance-amount" id="usdtBalance">$10,000</span>
-        </div>
-      </div>
-      <div class="holdings-list" id="holdingsList">
-        <p class="empty-state">No assets yet. Start trading!</p>
-      </div>
-      <div class="tx-history">
-        <h3>Transaction History</h3>
-        <div id="txList">
-          <p class="empty-state">No transactions yet</p>
-        </div>
-      </div>
-    </section>
 
   </div>
 
