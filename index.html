@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>صرافی کریپتو</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon">◈</span>
+          <span class="logo-text">CryptoX</span>
+        </div>
+        <div class="portfolio-badge">
+          <span class="portfolio-label">دارایی کل</span>
+          <span class="portfolio-value" id="totalPortfolio">$10,000.00</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="market">بازار</button>
+      <button class="tab" data-tab="trade">معامله</button>
+      <button class="tab" data-tab="wallet">کیف پول</button>
+    </nav>
+
+    <!-- Market Tab -->
+    <section class="tab-content active" id="tab-market">
+      <div class="section-header">
+        <h2>بازار زنده</h2>
+        <span class="live-dot"></span>
+      </div>
+      <div class="search-bar">
+        <input type="text" placeholder="جستجو..." id="searchInput" />
+      </div>
+      <div class="coin-list" id="coinList">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>در حال دریافت قیمت‌ها...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trade Tab -->
+    <section class="tab-content" id="tab-trade">
+      <div class="trade-card">
+        <h2 class="trade-title">خرید / فروش</h2>
+
+        <div class="trade-toggle">
+          <button class="trade-type active" id="buyBtn">خرید</button>
+          <button class="trade-type" id="sellBtn">فروش</button>
+        </div>
+
+        <div class="form-group">
+          <label>ارز</label>
+          <select id="tradeCoin" class="select-input">
+            <option value="bitcoin">بیت‌کوین (BTC)</option>
+            <option value="ethereum">اتریوم (ETH)</option>
+            <option value="tether">تتر (USDT)</option>
+            <option value="binancecoin">بایننس کوین (BNB)</option>
+            <option value="solana">سولانا (SOL)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>مقدار (USDT)</label>
+          <div class="amount-input-wrap">
+            <input type="number" id="tradeAmount" placeholder="0.00" class="amount-input" />
+            <span class="currency-badge">USDT</span>
+          </div>
+          <div class="quick-amounts">
+            <button class="quick-btn" data-amount="100">۱۰۰</button>
+            <button class="quick-btn" data-amount="500">۵۰۰</button>
+            <button class="quick-btn" data-amount="1000">۱۰۰۰</button>
+            <button class="quick-btn" data-amount="5000">۵۰۰۰</button>
+          </div>
+        </div>
+
+        <div class="trade-info-box" id="tradeInfoBox">
+          <div class="info-row">
+            <span>قیمت هر واحد</span>
+            <span id="unitPrice">-</span>
+          </div>
+          <div class="info-row">
+            <span>مقدار دریافتی</span>
+            <span id="receiveAmount">-</span>
+          </div>
+          <div class="info-row">
+            <span>کارمزد (۰.۱٪)</span>
+            <span id="feeAmount">-</span>
+          </div>
+        </div>
+
+        <button class="trade-btn buy" id="tradeBtn">ثبت سفارش خرید</button>
+      </div>
+    </section>
+
+    <!-- Wallet Tab -->
+    <section class="tab-content" id="tab-wallet">
+      <div class="wallet-header">
+        <div class="balance-circle">
+          <span class="balance-label">موجودی USDT</span>
+          <span class="balance-amount" id="usdtBalance">$10,000</span>
+        </div>
+      </div>
+      <div class="holdings-list" id="holdingsList">
+        <p class="empty-state">هنوز هیچ ارزی خریداری نشده</p>
+      </div>
+      <div class="tx-history">
+        <h3>تاریخچه معاملات</h3>
+        <div id="txList">
+          <p class="empty-state">تراکنشی وجود ندارد</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
