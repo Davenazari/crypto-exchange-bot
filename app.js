@@ -84,13 +84,24 @@ function renderMiniList() {
   list.innerHTML = state.allCoins.slice(0, 4).map(c => coinItemHTML(c, 'openChart')).join('');
 }
 
-// ─── Chart Module (Pure Canvas — no external lib) ───
+// ─── Chart Module (TradingView Widget) ───
 let currentChartCoin = null;
 let currentTf = 5;
 let chartSourcePage = 'market';
 
-const TF_DAYS = { 5: 1, 15: 1, 30: 2, 60: 7 };
-const TF_SEC  = { 5: 300, 15: 900, 30: 1800, 60: 3600 };
+const TF_INTERVAL = { 5: '5', 15: '15', 30: '30', 60: '60' };
+
+// CoinGecko id → TradingView symbol
+const TV_SYMBOL = {
+  bitcoin:     'BINANCE:BTCUSDT',
+  ethereum:    'BINANCE:ETHUSDT',
+  tether:      'BINANCE:USDTBUSD',
+  binancecoin: 'BINANCE:BNBUSDT',
+  solana:      'BINANCE:SOLUSDT',
+  ripple:      'BINANCE:XRPUSDT',
+  cardano:     'BINANCE:ADAUSDT',
+  dogecoin:    'BINANCE:DOGEUSDT',
+};
 
 async function openChart(coinId) {
   currentChartCoin = coinId;
@@ -106,152 +117,29 @@ async function openChart(coinId) {
 
   const change = p?.usd_24h_change?.toFixed(2);
   const badge = document.getElementById('chartChange');
-  badge.textContent = change !== undefined ? `${change >= 0 ? '+' : ''}${change}%` : '—';
+  badge.textContent = change !== undefined ? `${Number(change) >= 0 ? '+' : ''}${change}%` : '—';
   badge.className = `chart-change-badge ${Number(change) >= 0 ? 'positive' : 'negative'}`;
 
   document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`.tf-btn[data-tf="${currentTf}"]`)?.classList.add('active');
 
   switchPage('chart');
-  await loadChart(coinId, currentTf);
+  renderTVWidget(coinId, currentTf);
 }
 
-async function loadChart(coinId, tf) {
-  const basePrice = state.prices[coinId]?.usd || 1000;
+function renderTVWidget(coinId, tf) {
+  const container = document.getElementById('tvWidgetContainer');
+  const symbol = TV_SYMBOL[coinId] || 'BINANCE:BTCUSDT';
+  const interval = TF_INTERVAL[tf] || '5';
 
-  // Always draw demo immediately — no loading
-  const demoCandles = generateDemoCandles(basePrice, tf);
-  drawCanvas(demoCandles);
-
-  // Try real data in background
-  try {
-    const days = TF_DAYS[tf];
-    const res = await fetch(`https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=minutely`);
-    if (!res.ok) return;
-    const data = await res.json();
-    if (!data.prices || data.prices.length < 10) return;
-    const realCandles = buildCandles(data.prices, TF_SEC[tf]);
-    if (realCandles.length > 5) drawCanvas(realCandles);
-  } catch { /* keep demo */ }
-}
-
-function buildCandles(prices, bucketSec) {
-  const map = {};
-  for (const [ts, price] of prices) {
-    const t = Math.floor(ts / 1000 / bucketSec) * bucketSec;
-    if (!map[t]) map[t] = { t, open: price, high: price, low: price, close: price };
-    else {
-      if (price > map[t].high) map[t].high = price;
-      if (price < map[t].low)  map[t].low  = price;
-      map[t].close = price;
-    }
-  }
-  return Object.values(map).sort((a, b) => a.t - b.t);
-}
-
-function generateDemoCandles(basePrice, tf) {
-  const candles = [];
-  const now = Math.floor(Date.now() / 1000);
-  const sec = TF_SEC[tf];
-  const count = { 5: 80, 15: 70, 30: 60, 60: 60 }[tf] || 70;
-  let price = basePrice;
-  for (let i = count; i >= 0; i--) {
-    const vol = price * 0.009;
-    const open = price;
-    const close = price + (Math.random() - 0.47) * vol;
-    const high = Math.max(open, close) + Math.random() * vol * 0.5;
-    const low  = Math.min(open, close) - Math.random() * vol * 0.5;
-    candles.push({ t: now - i * sec, open, high, low, close });
-    price = close;
-  }
-  return candles;
-}
-
-function drawCanvas(candles) {
-  const canvas = document.getElementById('chartCanvas');
-  if (!canvas) return;
-
-  const dpr = window.devicePixelRatio || 1;
-  const W = canvas.parentElement.clientWidth;
-  const H = 260;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
-  canvas.style.width  = W + 'px';
-  canvas.style.height = H + 'px';
-
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-
-  const PAD = { top: 16, right: 60, bottom: 28, left: 8 };
-  const cW = W - PAD.left - PAD.right;
-  const cH = H - PAD.top - PAD.bottom;
-
-  // Background
-  ctx.clearRect(0, 0, W, H);
-
-  // Price range
-  const prices = candles.flatMap(c => [c.high, c.low]);
-  const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
-  const range = maxP - minP || 1;
-  const pad = range * 0.1;
-  const lo = minP - pad;
-  const hi = maxP + pad;
-  const scaleY = p => PAD.top + cH - ((p - lo) / (hi - lo)) * cH;
-
-  // Grid lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = PAD.top + (cH / 4) * i;
-    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-    const price = hi - ((hi - lo) / 4) * i;
-    ctx.fillStyle = 'rgba(220,230,255,0.4)';
-    ctx.font = '10px DM Mono, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(formatPrice(price), W - PAD.right + 4, y + 4);
-  }
-
-  // Candles
-  const n = candles.length;
-  const candleW = Math.max(2, Math.floor(cW / n) - 1);
-  const gap = cW / n;
-
-  candles.forEach((c, i) => {
-    const x = PAD.left + i * gap + gap / 2;
-    const isGreen = c.close >= c.open;
-    const color = isGreen ? '#00e5a0' : '#ff5252';
-
-    // Wick
-    ctx.strokeStyle = isGreen ? 'rgba(0,229,160,0.7)' : 'rgba(255,82,82,0.7)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, scaleY(c.high));
-    ctx.lineTo(x, scaleY(c.low));
-    ctx.stroke();
-
-    // Body
-    const yOpen  = scaleY(c.open);
-    const yClose = scaleY(c.close);
-    const bodyTop = Math.min(yOpen, yClose);
-    const bodyH   = Math.max(1, Math.abs(yOpen - yClose));
-    ctx.fillStyle = color;
-    ctx.fillRect(x - candleW / 2, bodyTop, candleW, bodyH);
-  });
-
-  // Time labels
-  const labelCount = 5;
-  const step = Math.floor(n / labelCount);
-  ctx.fillStyle = 'rgba(220,230,255,0.35)';
-  ctx.font = '10px DM Mono, monospace';
-  ctx.textAlign = 'center';
-  for (let i = 0; i < n; i += step) {
-    const c = candles[i];
-    const x = PAD.left + i * gap + gap / 2;
-    const d = new Date(c.t * 1000);
-    const label = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-    ctx.fillText(label, x, H - 6);
-  }
+  container.innerHTML = `
+    <iframe
+      src="https://s.tradingview.com/widgetembed/?symbol=${encodeURIComponent(symbol)}&interval=${interval}&theme=dark&style=1&locale=en&hide_top_toolbar=0&hide_legend=0&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&backgroundColor=rgba(13,13,30,0)&gridColor=rgba(255,255,255,0.05)"
+      style="width:100%;height:320px;border:none;display:block;"
+      allowtransparency="true"
+      frameborder="0"
+      scrolling="no">
+    </iframe>`;
 }
 
 function goToTradeFromChart(mode) {
@@ -400,7 +288,7 @@ document.querySelectorAll('.tf-btn').forEach(btn => {
     document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTf = parseInt(btn.dataset.tf);
-    if (currentChartCoin) loadChart(currentChartCoin, currentTf);
+    if (currentChartCoin) renderTVWidget(currentChartCoin, currentTf);
   });
 });
 
@@ -434,13 +322,6 @@ document.querySelectorAll('.quick-chip').forEach(btn => {
     document.getElementById('tradeAmount').value = btn.dataset.amount;
     updateTradeInfo();
   });
-});
-
-// Resize chart on orientation change
-window.addEventListener('resize', () => {
-  if (currentChartCoin && document.getElementById('page-chart').classList.contains('active')) {
-    loadChart(currentChartCoin, currentTf);
-  }
 });
 
 // ─── Init ───
