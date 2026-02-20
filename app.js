@@ -27,19 +27,134 @@ const COINS = [
 
 const COIN_IDS = COINS.map(c => c.id).join(',');
 
-// ─── Fetch Prices ───
-async function fetchPrices() {
+// Binance WebSocket symbol mapping
+const BINANCE_WS_SYMBOL = {
+  bitcoin:     'btcusdt',
+  ethereum:    'ethusdt',
+  tether:      null, // stable, always ~1
+  binancecoin: 'bnbusdt',
+  solana:      'solusdt',
+  ripple:      'xrpusdt',
+  cardano:     'adausdt',
+  dogecoin:    'dogeusdt',
+};
+
+// ─── Init prices from Binance REST (fast, no rate limit) ───
+async function fetchInitialPrices() {
   try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${COIN_IDS}&vs_currencies=usd&include_24hr_change=true`);
+    const symbols = COINS
+      .filter(c => BINANCE_WS_SYMBOL[c.id])
+      .map(c => `"${BINANCE_WS_SYMBOL[c.id].toUpperCase()}"`);
+    const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols.join(',')}]`);
     const data = await res.json();
-    state.prices = data;
+
+    // Tether is always $1
+    state.prices['tether'] = { usd: 1, usd_24h_change: 0 };
+
+    for (const ticker of data) {
+      const coin = COINS.find(c =>
+        BINANCE_WS_SYMBOL[c.id] === ticker.symbol.toLowerCase()
+      );
+      if (coin) {
+        state.prices[coin.id] = {
+          usd: parseFloat(ticker.lastPrice),
+          usd_24h_change: parseFloat(ticker.priceChangePercent),
+        };
+      }
+    }
+
     state.allCoins = COINS;
     renderMarket();
     renderMiniList();
     updatePortfolioValue();
   } catch {
-    const el = document.getElementById('coinList');
-    if (el) el.innerHTML = `<p class="empty-state">Failed to load. Retrying…</p>`;
+    // fallback to CoinGecko if Binance fails
+    try {
+      const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${COIN_IDS}&vs_currencies=usd&include_24hr_change=true`);
+      const data = await res.json();
+      state.prices = data;
+      state.allCoins = COINS;
+      renderMarket();
+      renderMiniList();
+      updatePortfolioValue();
+    } catch { /* silent */ }
+  }
+}
+
+// ─── Binance WebSocket for real-time updates ───
+let ws = null;
+
+function connectWebSocket() {
+  const streams = COINS
+    .filter(c => BINANCE_WS_SYMBOL[c.id])
+    .map(c => `${BINANCE_WS_SYMBOL[c.id]}@ticker`)
+    .join('/');
+
+  ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`);
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (!msg.data) return;
+    const d = msg.data;
+    const coin = COINS.find(c => BINANCE_WS_SYMBOL[c.id] === d.s.toLowerCase());
+    if (!coin) return;
+
+    const newPrice = parseFloat(d.c);
+    const oldPrice = state.prices[coin.id]?.usd;
+
+    state.prices[coin.id] = {
+      usd: newPrice,
+      usd_24h_change: parseFloat(d.P),
+    };
+
+    // Update UI elements in-place (no full re-render — smooth & fast)
+    updateCoinPriceInDOM(coin.id, newPrice, oldPrice, parseFloat(d.P));
+    updatePortfolioValue();
+    updateTradeInfoIfVisible(coin.id);
+  };
+
+  ws.onclose = () => {
+    // Reconnect after 3s if connection drops
+    setTimeout(connectWebSocket, 3000);
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+function updateCoinPriceInDOM(coinId, newPrice, oldPrice, change) {
+  // Update all coin-item elements showing this coin
+  document.querySelectorAll(`[data-coin-id="${coinId}"]`).forEach(el => {
+    const priceEl = el.querySelector('.coin-price');
+    const changeEl = el.querySelector('.coin-change');
+    if (priceEl) {
+      // Flash green/red on price change
+      const isUp = !oldPrice || newPrice >= oldPrice;
+      priceEl.textContent = `$${formatPrice(newPrice)}`;
+      priceEl.classList.remove('flash-up', 'flash-down');
+      void priceEl.offsetWidth; // force reflow
+      priceEl.classList.add(isUp ? 'flash-up' : 'flash-down');
+    }
+    if (changeEl) {
+      const isPos = change >= 0;
+      changeEl.textContent = `${isPos ? '+' : ''}${change.toFixed(2)}%`;
+      changeEl.className = `coin-change ${isPos ? 'positive' : 'negative'}`;
+    }
+  });
+
+  // Update chart header if this coin is open
+  if (coinId === currentChartCoin) {
+    document.getElementById('chartPrice').textContent = `$${formatPrice(newPrice)}`;
+    const badge = document.getElementById('chartChange');
+    badge.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+    badge.className = `chart-change-badge ${change >= 0 ? 'positive' : 'negative'}`;
+  }
+}
+
+function updateTradeInfoIfVisible(coinId) {
+  const tradePage = document.getElementById('page-trade');
+  if (tradePage?.classList.contains('active')) {
+    const selected = document.getElementById('tradeCoin')?.value;
+    if (selected === coinId) updateTradeInfo();
   }
 }
 
@@ -50,7 +165,7 @@ function coinItemHTML(coin, onclick) {
   const change = p.usd_24h_change?.toFixed(2);
   const isPos = change >= 0;
   return `
-    <div class="coin-item" onclick="${onclick}('${coin.id}')">
+    <div class="coin-item" data-coin-id="${coin.id}" onclick="${onclick}('${coin.id}')">
       <div class="coin-left">
         <div class="coin-icon">${coin.icon}</div>
         <div>
@@ -325,5 +440,4 @@ document.querySelectorAll('.quick-chip').forEach(btn => {
 });
 
 // ─── Init ───
-fetchPrices();
-setInterval(fetchPrices, 30000);
+fetchInitialPrices().then(() => connectWebSocket());
