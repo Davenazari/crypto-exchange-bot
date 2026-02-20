@@ -15,14 +15,14 @@ let state = {
 };
 
 const COINS = [
-  { id: 'bitcoin',     symbol: 'BTC',  name: 'Bitcoin',  icon: '₿' },
-  { id: 'ethereum',    symbol: 'ETH',  name: 'Ethereum', icon: 'Ξ' },
-  { id: 'tether',      symbol: 'USDT', name: 'Tether',   icon: '₮' },
-  { id: 'binancecoin', symbol: 'BNB',  name: 'BNB',      icon: '⬡' },
-  { id: 'solana',      symbol: 'SOL',  name: 'Solana',   icon: '◎' },
-  { id: 'ripple',      symbol: 'XRP',  name: 'XRP',      icon: '✕' },
-  { id: 'cardano',     symbol: 'ADA',  name: 'Cardano',  icon: '₳' },
-  { id: 'dogecoin',    symbol: 'DOGE', name: 'Dogecoin', icon: 'Ð' },
+  { id: 'bitcoin',     symbol: 'BTC',  name: 'Bitcoin',  icon: '₿', img: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
+  { id: 'ethereum',    symbol: 'ETH',  name: 'Ethereum', icon: 'Ξ', img: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
+  { id: 'tether',      symbol: 'USDT', name: 'Tether',   icon: '₮', img: 'https://assets.coingecko.com/coins/images/325/small/Tether.png' },
+  { id: 'binancecoin', symbol: 'BNB',  name: 'BNB',      icon: '⬡', img: 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png' },
+  { id: 'solana',      symbol: 'SOL',  name: 'Solana',   icon: '◎', img: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
+  { id: 'ripple',      symbol: 'XRP',  name: 'XRP',      icon: '✕', img: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
+  { id: 'cardano',     symbol: 'ADA',  name: 'Cardano',  icon: '₳', img: 'https://assets.coingecko.com/coins/images/975/small/cardano.png' },
+  { id: 'dogecoin',    symbol: 'DOGE', name: 'Dogecoin', icon: 'Ð', img: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
 ];
 
 const COIN_IDS = COINS.map(c => c.id).join(',');
@@ -167,7 +167,10 @@ function coinItemHTML(coin, onclick) {
   return `
     <div class="coin-item" data-coin-id="${coin.id}" onclick="${onclick}('${coin.id}')">
       <div class="coin-left">
-        <div class="coin-icon">${coin.icon}</div>
+        <div class="coin-icon">
+          <img src="${coin.img}" alt="${coin.symbol}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+          <span class="coin-icon-fallback" style="display:none">${coin.icon}</span>
+        </div>
         <div>
           <div class="coin-name">${coin.name}</div>
           <div class="coin-symbol">${coin.symbol}</div>
@@ -226,7 +229,8 @@ async function openChart(coinId) {
   const coin = COINS.find(c => c.id === coinId);
   const p = state.prices[coinId];
 
-  document.getElementById('chartIcon').textContent = coin.icon;
+  const chartIconEl = document.getElementById('chartIcon');
+  chartIconEl.innerHTML = `<img src="${coin.img}" alt="${coin.symbol}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;" onerror="this.outerHTML='${coin.icon}'" />`;
   document.getElementById('chartName').textContent = coin.name;
   document.getElementById('chartPrice').textContent = p ? `$${formatPrice(p.usd)}` : '—';
 
