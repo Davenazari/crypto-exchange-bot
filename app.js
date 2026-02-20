@@ -129,8 +129,7 @@ async function loadChart(coinId, tf) {
   // Destroy old chart
   if (chartInstance) { chartInstance.remove(); chartInstance = null; candleSeries = null; }
 
-  // Small delay so page is visible before heavy render
-  await new Promise(r => setTimeout(r, 80));
+  await new Promise(r => setTimeout(r, 60));
 
   chartInstance = LightweightCharts.createChart(container, {
     width: container.clientWidth,
@@ -165,26 +164,29 @@ async function loadChart(coinId, tf) {
     wickDownColor: 'rgba(255,82,82,0.7)',
   });
 
-  let candles = [];
+  // Step 1: Show demo candles IMMEDIATELY so loader disappears fast
+  const basePrice = state.prices[coinId]?.usd || 1000;
+  const demoCandles = generateDemoCandles(basePrice, tf);
+  candleSeries.setData(demoCandles);
+  chartInstance.timeScale().fitContent();
+  loader.classList.add('hidden'); // ← hide loader right away
+
+  // Step 2: Try to fetch real data in background (no timeout pressure)
   try {
     const days = TF_DAYS[tf];
     const url = `https://api.coingecko.com/api/v3/coins/${coinId}/market_chart?vs_currency=usd&days=${days}&interval=minutely`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('API error');
+    if (!res.ok) return; // stay with demo
     const data = await res.json();
-    candles = buildCandles(data.prices, TF_SEC[tf]);
+    if (!data.prices || data.prices.length < 10) return; // bad data, keep demo
+    const realCandles = buildCandles(data.prices, TF_SEC[tf]);
+    if (realCandles.length > 5 && candleSeries) {
+      candleSeries.setData(realCandles);
+      chartInstance.timeScale().fitContent();
+    }
   } catch {
-    // Fallback to realistic demo candles
-    const basePrice = state.prices[coinId]?.usd || 1000;
-    candles = generateDemoCandles(basePrice, tf);
+    // silently keep demo candles — already visible
   }
-
-  if (candles.length > 0) {
-    candleSeries.setData(candles);
-    chartInstance.timeScale().fitContent();
-  }
-
-  loader.classList.add('hidden');
 }
 
 function buildCandles(prices, bucketSec) {
