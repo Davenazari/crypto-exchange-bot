@@ -529,3 +529,86 @@ html, body {
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.success { border-color: rgba(0,229,160,0.4); color: var(--green); }
 .toast.error { border-color: rgba(255,82,82,0.4); color: var(--red); }
+
+/* ─── Chart Page ─── */
+.back-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  padding: 7px 14px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.back-btn:hover { background: rgba(255,255,255,0.12); }
+
+.chart-coin-info {
+  display: flex; align-items: center; gap: 10px;
+  flex: 1; justify-content: center;
+}
+.chart-coin-icon { font-size: 22px; }
+.chart-coin-name { font-size: 14px; font-weight: 700; }
+.chart-coin-price { font-size: 13px; color: var(--accent); font-family: 'DM Mono', monospace; font-weight: 500; }
+
+.chart-change-badge {
+  font-size: 12px; font-weight: 700;
+  padding: 4px 10px; border-radius: 999px;
+  flex-shrink: 0;
+}
+.chart-change-badge.positive { background: rgba(0,229,160,0.15); color: var(--green); border: 1px solid rgba(0,229,160,0.25); }
+.chart-change-badge.negative { background: rgba(255,82,82,0.15); color: var(--red); border: 1px solid rgba(255,82,82,0.25); }
+
+/* Timeframe row */
+.tf-row {
+  display: flex; gap: 8px;
+  margin: 12px 0;
+}
+.tf-btn {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 9px 4px;
+  color: var(--text2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+.tf-btn.active {
+  background: rgba(79,195,247,0.15);
+  border-color: rgba(79,195,247,0.45);
+  color: var(--accent);
+}
+.tf-btn:hover:not(.active) { color: var(--text); border-color: rgba(255,255,255,0.18); }
+
+/* Chart container */
+.chart-wrap {
+  position: relative;
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+#chartContainer {
+  width: 100%;
+  height: 260px;
+}
+.chart-loader {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(10,12,25,0.6);
+  backdrop-filter: blur(8px);
+  gap: 10px;
+  color: var(--text2); font-size: 13px;
+  transition: opacity 0.3s;
+  z-index: 10;
+}
+.chart-loader.hidden { opacity: 0; pointer-events: none; }
+
+.chart-trade-row { display: flex; gap: 10px; }
