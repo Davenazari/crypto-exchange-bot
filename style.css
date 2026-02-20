@@ -151,7 +151,7 @@ html, body { height:100%; background:#0a0a0f; color:var(--text); font-family:'DM
 .tf-btn.active { background:rgba(79,195,247,0.15); border-color:rgba(79,195,247,0.45); color:var(--accent); }
 
 .chart-wrap { position:relative; padding:0; overflow:hidden; margin-bottom:14px; border-radius:var(--radius-lg); }
-#chartContainer { width:100%; height:260px; }
+#chartCanvas { width:100%; height:260px; display:block; border-radius:var(--radius-lg); }
 .chart-loader { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(10,12,25,0.75); backdrop-filter:blur(8px); gap:10px; color:var(--text2); font-size:13px; z-index:10; transition:opacity .3s; border-radius:var(--radius-lg); }
 .chart-loader.hidden { opacity:0; pointer-events:none; }
 .chart-trade-row { display:flex; gap:10px; }
