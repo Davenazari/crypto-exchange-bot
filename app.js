@@ -311,8 +311,7 @@ function goToTradeFromChart(mode) {
 // ─── Trade ───
 function goToTrade(coinId) {
   switchPage('trade');
-  document.getElementById('tradeCoin').value = coinId;
-  updateTradeInfo();
+  selectCoin(coinId, 'trade');
 }
 
 function updateTradeInfo() {
@@ -453,7 +452,7 @@ document.querySelectorAll('.tf-btn').forEach(btn => {
 document.getElementById('searchInput').addEventListener('input', e => renderMarket(e.target.value));
 
 // Trade
-document.getElementById('tradeCoin').addEventListener('change', updateTradeInfo);
+// Trade amount input
 document.getElementById('tradeAmount').addEventListener('input', updateTradeInfo);
 
 document.getElementById('buyBtn').addEventListener('click', () => {
@@ -482,6 +481,7 @@ document.querySelectorAll('.quick-chip').forEach(btn => {
 });
 
 // ─── Init ───
+initDropdownDisplays();
 fetchInitialPrices().then(() => connectWebSocket());
 
 // ============================================
@@ -720,20 +720,22 @@ const MAJOR_IDS = ['bitcoin','ethereum','binancecoin','solana','ripple','cardano
 const MEME_IDS  = ['dogecoin','shiba-inu','pepe','bonk','dogwifcoin','floki','cat-in-a-dogs-world','brett-based'];
 
 let dropdownOpen = false;
+let tradeDropdownOpen = false;
 
-function buildCoinDropdown() {
-  const list = document.getElementById('coinDropdownList');
-  const selected = document.getElementById('futuresCoin').value;
-
+// ── Build a dropdown list HTML ──
+function buildDropdownHTML(coins, selectedId, showLev = false) {
   const renderGroup = (ids, label) => {
-    const coins = FUTURES_COINS.filter(c => ids.includes(c.id));
+    const group = coins.filter(c => ids.includes(c.id));
+    if (!group.length) return '';
     return `<div class="coin-dropdown-divider">${label}</div>` +
-      coins.map(coin => {
+      group.map(coin => {
         const p = state.prices[coin.id];
         const price = p ? `$${formatPrice(p.usd)}` : '—';
+        const change = p?.usd_24h_change?.toFixed(2);
+        const isPos = change >= 0;
         const maxLev = MAX_LEVERAGE[coin.id] || 25;
         return `
-          <div class="coin-dropdown-option ${coin.id === selected ? 'selected' : ''}" onclick="selectFuturesCoin('${coin.id}')">
+          <div class="coin-dropdown-option ${coin.id === selectedId ? 'selected' : ''}" onclick="selectCoin('${coin.id}','${showLev ? 'futures' : 'trade'}')">
             <div class="opt-left">
               <img src="${coin.img}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid rgba(255,255,255,0.1)" />
               <div>
@@ -743,13 +745,39 @@ function buildCoinDropdown() {
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <span class="opt-price">${price}</span>
-              <span class="opt-lev">max ${maxLev}x</span>
+              ${showLev
+                ? `<span class="opt-lev">max ${maxLev}x</span>`
+                : `<span class="coin-change ${isPos ? 'positive' : 'negative'}" style="font-size:11px">${isPos ? '+' : ''}${change}%</span>`
+              }
             </div>
           </div>`;
       }).join('');
   };
 
-  list.innerHTML = renderGroup(MAJOR_IDS, '🔵 Major') + renderGroup(MEME_IDS, '🐸 Meme');
+  const majorGroup = renderGroup(MAJOR_IDS, '🔵 Major');
+  const memeGroup  = renderGroup(MEME_IDS,  '🐸 Meme');
+  // For trade page, also show tether in majors if not futures
+  const tetherGroup = !showLev ? renderGroup(['tether'], '💵 Stable') : '';
+  return majorGroup + tetherGroup + memeGroup;
+}
+
+function selectCoin(coinId, mode) {
+  const coin = COINS.find(c => c.id === coinId);
+  if (mode === 'futures') {
+    document.getElementById('futuresCoin').value = coinId;
+    document.getElementById('futuresCoinImg').src = coin.img;
+    document.getElementById('futuresCoinName').textContent = coin.name;
+    document.getElementById('futuresCoinSym').textContent = coin.symbol;
+    if (dropdownOpen) toggleCoinDropdown();
+    updateLeverageUI();
+  } else {
+    document.getElementById('tradeCoin').value = coinId;
+    document.getElementById('tradeCoinImg').src = coin.img;
+    document.getElementById('tradeCoinName').textContent = coin.name;
+    document.getElementById('tradeCoinSym').textContent = coin.symbol;
+    if (tradeDropdownOpen) toggleTradeDropdown();
+    updateTradeInfo();
+  }
 }
 
 function toggleCoinDropdown() {
@@ -757,9 +785,8 @@ function toggleCoinDropdown() {
   const listEl = document.getElementById('coinDropdownList');
   const arrow  = document.getElementById('dropdownArrow');
   const sel    = document.getElementById('futuresCoinSelected');
-
   if (dropdownOpen) {
-    buildCoinDropdown();
+    listEl.innerHTML = buildDropdownHTML(FUTURES_COINS, document.getElementById('futuresCoin').value, true);
     listEl.style.display = 'block';
     arrow.classList.add('open');
     sel.classList.add('open');
@@ -770,30 +797,36 @@ function toggleCoinDropdown() {
   }
 }
 
-function selectFuturesCoin(coinId) {
-  const coin = COINS.find(c => c.id === coinId);
-  document.getElementById('futuresCoin').value = coinId;
-  document.getElementById('futuresCoinImg').src = coin.img;
-  document.getElementById('futuresCoinName').textContent = coin.name;
-  document.getElementById('futuresCoinSym').textContent = coin.symbol;
-  toggleCoinDropdown();
-  updateLeverageUI();
+function toggleTradeDropdown() {
+  tradeDropdownOpen = !tradeDropdownOpen;
+  const listEl = document.getElementById('tradeDropdownList');
+  const arrow  = document.getElementById('tradeDropdownArrow');
+  const sel    = document.getElementById('tradeCoinSelected');
+  if (tradeDropdownOpen) {
+    listEl.innerHTML = buildDropdownHTML(COINS, document.getElementById('tradeCoin').value, false);
+    listEl.style.display = 'block';
+    arrow.classList.add('open');
+    sel.classList.add('open');
+  } else {
+    listEl.style.display = 'none';
+    arrow.classList.remove('open');
+    sel.classList.remove('open');
+  }
 }
 
-// Close dropdown when clicking outside
+// Close both dropdowns when clicking outside
 document.addEventListener('click', e => {
-  if (dropdownOpen && !document.getElementById('futuresCoinDropdown').contains(e.target)) {
-    toggleCoinDropdown();
-  }
+  if (dropdownOpen && !document.getElementById('futuresCoinDropdown')?.contains(e.target)) toggleCoinDropdown();
+  if (tradeDropdownOpen && !document.getElementById('tradeCoinDropdown')?.contains(e.target)) toggleTradeDropdown();
 });
 
-// Init dropdown display
-window.addEventListener('DOMContentLoaded', () => {
-  const first = FUTURES_COINS[0];
-  document.getElementById('futuresCoinImg').src = first.img;
-  document.getElementById('futuresCoinName').textContent = first.name;
-  document.getElementById('futuresCoinSym').textContent = first.symbol;
-});
+// Init dropdown displays after prices load
+function initDropdownDisplays() {
+  const btc = COINS[0];
+  ['futuresCoinImg','tradeCoinImg'].forEach(id => { const el = document.getElementById(id); if(el) el.src = btc.img; });
+  ['futuresCoinName','tradeCoinName'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = btc.name; });
+  ['futuresCoinSym','tradeCoinSym'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = btc.symbol; });
+}
 
 // ─── Futures Event Listeners ───
 document.getElementById('longBtn').addEventListener('click', () => {

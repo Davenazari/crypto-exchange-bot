@@ -300,7 +300,11 @@ html, body { height:100%; background:#0a0a0f; color:var(--text); font-family:'DM
   scrollbar-width: thin;
   scrollbar-color: rgba(255,255,255,0.1) transparent;
   z-index: 100;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7);
+  background: rgba(12, 15, 35, 0.97) !important;
+  backdrop-filter: blur(40px) !important;
+  -webkit-backdrop-filter: blur(40px) !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
 }
 .coin-dropdown-list::-webkit-scrollbar { width: 4px; }
 .coin-dropdown-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 999px; }

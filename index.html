@@ -121,28 +121,20 @@
           </div>
           <div class="field-group">
             <label class="field-label">Asset</label>
-            <select id="tradeCoin" class="glass-input select-input">
-              <option value="bitcoin">Bitcoin (BTC)</option>
-              <option value="ethereum">Ethereum (ETH)</option>
-              <option value="tether">Tether (USDT)</option>
-              <option value="binancecoin">BNB (BNB)</option>
-              <option value="solana">Solana (SOL)</option>
-              <option value="ripple">XRP (XRP)</option>
-              <option value="cardano">Cardano (ADA)</option>
-              <option value="avalanche-2">Avalanche (AVAX)</option>
-              <option value="chainlink">Chainlink (LINK)</option>
-              <option value="polkadot">Polkadot (DOT)</option>
-              <option value="tron">TRON (TRX)</option>
-              <option value="sui">Sui (SUI)</option>
-              <option value="dogecoin">Dogecoin (DOGE)</option>
-              <option value="shiba-inu">Shiba Inu (SHIB)</option>
-              <option value="pepe">Pepe (PEPE)</option>
-              <option value="bonk">Bonk (BONK)</option>
-              <option value="dogwifcoin">dogwifhat (WIF)</option>
-              <option value="floki">FLOKI (FLOKI)</option>
-              <option value="cat-in-a-dogs-world">cat in a dogs world (MEW)</option>
-              <option value="brett-based">Brett (BRETT)</option>
-            </select>
+            <div class="coin-dropdown" id="tradeCoinDropdown">
+              <div class="coin-dropdown-selected" id="tradeCoinSelected" onclick="toggleTradeDropdown()">
+                <div class="coin-dropdown-coin">
+                  <img id="tradeCoinImg" src="https://assets.coingecko.com/coins/images/1/small/bitcoin.png" style="width:32px;height:32px;border-radius:50%;object-fit:cover" />
+                  <div>
+                    <div class="coin-dropdown-name" id="tradeCoinName">Bitcoin</div>
+                    <div class="coin-dropdown-sym" id="tradeCoinSym">BTC</div>
+                  </div>
+                </div>
+                <svg class="dropdown-arrow" id="tradeDropdownArrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="coin-dropdown-list glass-card" id="tradeDropdownList" style="display:none"></div>
+            </div>
+            <input type="hidden" id="tradeCoin" value="bitcoin" />
           </div>
           <div class="field-group">
             <label class="field-label">Amount (USDT)</label>
