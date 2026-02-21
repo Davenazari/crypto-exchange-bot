@@ -15,28 +15,54 @@ let state = {
 };
 
 const COINS = [
-  { id: 'bitcoin',     symbol: 'BTC',  name: 'Bitcoin',  icon: '₿', img: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
-  { id: 'ethereum',    symbol: 'ETH',  name: 'Ethereum', icon: 'Ξ', img: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
-  { id: 'tether',      symbol: 'USDT', name: 'Tether',   icon: '₮', img: 'https://assets.coingecko.com/coins/images/325/small/Tether.png' },
-  { id: 'binancecoin', symbol: 'BNB',  name: 'BNB',      icon: '⬡', img: 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png' },
-  { id: 'solana',      symbol: 'SOL',  name: 'Solana',   icon: '◎', img: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
-  { id: 'ripple',      symbol: 'XRP',  name: 'XRP',      icon: '✕', img: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
-  { id: 'cardano',     symbol: 'ADA',  name: 'Cardano',  icon: '₳', img: 'https://assets.coingecko.com/coins/images/975/small/cardano.png' },
-  { id: 'dogecoin',    symbol: 'DOGE', name: 'Dogecoin', icon: 'Ð', img: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
+  // ── Major coins ──
+  { id: 'bitcoin',          symbol: 'BTC',   name: 'Bitcoin',        icon: '₿', img: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png' },
+  { id: 'ethereum',         symbol: 'ETH',   name: 'Ethereum',       icon: 'Ξ', img: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png' },
+  { id: 'tether',           symbol: 'USDT',  name: 'Tether',         icon: '₮', img: 'https://assets.coingecko.com/coins/images/325/small/Tether.png' },
+  { id: 'binancecoin',      symbol: 'BNB',   name: 'BNB',            icon: '⬡', img: 'https://assets.coingecko.com/coins/images/825/small/bnb-icon2_2x.png' },
+  { id: 'solana',           symbol: 'SOL',   name: 'Solana',         icon: '◎', img: 'https://assets.coingecko.com/coins/images/4128/small/solana.png' },
+  { id: 'ripple',           symbol: 'XRP',   name: 'XRP',            icon: '✕', img: 'https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png' },
+  { id: 'cardano',          symbol: 'ADA',   name: 'Cardano',        icon: '₳', img: 'https://assets.coingecko.com/coins/images/975/small/cardano.png' },
+  { id: 'avalanche-2',      symbol: 'AVAX',  name: 'Avalanche',      icon: '🔺', img: 'https://assets.coingecko.com/coins/images/12559/small/Avalanche_Circle_RedWhite_Trans.png' },
+  { id: 'chainlink',        symbol: 'LINK',  name: 'Chainlink',      icon: '⬡', img: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png' },
+  { id: 'polkadot',         symbol: 'DOT',   name: 'Polkadot',       icon: '●', img: 'https://assets.coingecko.com/coins/images/12171/small/polkadot.png' },
+  { id: 'tron',             symbol: 'TRX',   name: 'TRON',           icon: '◈', img: 'https://assets.coingecko.com/coins/images/1094/small/tron-logo.png' },
+  { id: 'sui',              symbol: 'SUI',   name: 'Sui',            icon: '💧', img: 'https://assets.coingecko.com/coins/images/26375/small/sui_asset.jpeg' },
+  // ── Memecoins ──
+  { id: 'dogecoin',         symbol: 'DOGE',  name: 'Dogecoin',       icon: 'Ð', img: 'https://assets.coingecko.com/coins/images/5/small/dogecoin.png' },
+  { id: 'shiba-inu',        symbol: 'SHIB',  name: 'Shiba Inu',      icon: '🐕', img: 'https://assets.coingecko.com/coins/images/11939/small/shiba.png' },
+  { id: 'pepe',             symbol: 'PEPE',  name: 'Pepe',           icon: '🐸', img: 'https://assets.coingecko.com/coins/images/29850/small/pepe-token.jpeg' },
+  { id: 'bonk',             symbol: 'BONK',  name: 'Bonk',           icon: '🔨', img: 'https://assets.coingecko.com/coins/images/28600/small/bonk.jpg' },
+  { id: 'dogwifcoin',       symbol: 'WIF',   name: 'dogwifhat',      icon: '🎩', img: 'https://assets.coingecko.com/coins/images/33566/small/dogwifhat.jpg' },
+  { id: 'floki',            symbol: 'FLOKI', name: 'FLOKI',          icon: '⚡', img: 'https://assets.coingecko.com/coins/images/16746/small/PNG_image.png' },
+  { id: 'cat-in-a-dogs-world', symbol: 'MEW', name: 'cat in a dogs world', icon: '🐱', img: 'https://assets.coingecko.com/coins/images/36440/small/MEW.png' },
+  { id: 'brett-based',      symbol: 'BRETT', name: 'Brett',          icon: '🟦', img: 'https://assets.coingecko.com/coins/images/35529/small/Brett.png' },
 ];
 
 const COIN_IDS = COINS.map(c => c.id).join(',');
 
 // Binance WebSocket symbol mapping
 const BINANCE_WS_SYMBOL = {
-  bitcoin:     'btcusdt',
-  ethereum:    'ethusdt',
-  tether:      null, // stable, always ~1
-  binancecoin: 'bnbusdt',
-  solana:      'solusdt',
-  ripple:      'xrpusdt',
-  cardano:     'adausdt',
-  dogecoin:    'dogeusdt',
+  bitcoin:               'btcusdt',
+  ethereum:              'ethusdt',
+  tether:                null,
+  binancecoin:           'bnbusdt',
+  solana:                'solusdt',
+  ripple:                'xrpusdt',
+  cardano:               'adausdt',
+  'avalanche-2':         'avaxusdt',
+  chainlink:             'linkusdt',
+  polkadot:              'dotusdt',
+  tron:                  'trxusdt',
+  sui:                   'suiusdt',
+  dogecoin:              'dogeusdt',
+  'shiba-inu':           'shibusdt',
+  pepe:                  'pepeusdt',
+  bonk:                  'bonkusdt',
+  dogwifcoin:            'wifusdt',
+  floki:                 'flokiusdt',
+  'cat-in-a-dogs-world': 'mewusdt',
+  'brett-based':         null, // not on Binance, will use CoinGecko fallback
 };
 
 // ─── Init prices from Binance REST (fast, no rate limit) ───
@@ -211,14 +237,26 @@ const TF_INTERVAL = { 5: '5', 15: '15', 30: '30', 60: '60' };
 
 // CoinGecko id → TradingView symbol
 const TV_SYMBOL = {
-  bitcoin:     'BINANCE:BTCUSDT',
-  ethereum:    'BINANCE:ETHUSDT',
-  tether:      'BINANCE:USDTBUSD',
-  binancecoin: 'BINANCE:BNBUSDT',
-  solana:      'BINANCE:SOLUSDT',
-  ripple:      'BINANCE:XRPUSDT',
-  cardano:     'BINANCE:ADAUSDT',
-  dogecoin:    'BINANCE:DOGEUSDT',
+  bitcoin:               'BINANCE:BTCUSDT',
+  ethereum:              'BINANCE:ETHUSDT',
+  tether:                'BINANCE:USDTBUSD',
+  binancecoin:           'BINANCE:BNBUSDT',
+  solana:                'BINANCE:SOLUSDT',
+  ripple:                'BINANCE:XRPUSDT',
+  cardano:               'BINANCE:ADAUSDT',
+  'avalanche-2':         'BINANCE:AVAXUSDT',
+  chainlink:             'BINANCE:LINKUSDT',
+  polkadot:              'BINANCE:DOTUSDT',
+  tron:                  'BINANCE:TRXUSDT',
+  sui:                   'BINANCE:SUIUSDT',
+  dogecoin:              'BINANCE:DOGEUSDT',
+  'shiba-inu':           'BINANCE:SHIBUSDT',
+  pepe:                  'BINANCE:PEPEUSDT',
+  bonk:                  'BINANCE:BONKUSDT',
+  dogwifcoin:            'BINANCE:WIFUSDT',
+  floki:                 'BINANCE:FLOKIUSDT',
+  'cat-in-a-dogs-world': 'BYBIT:MEWUSDT',
+  'brett-based':         'BYBIT:BRETTUSDT',
 };
 
 async function openChart(coinId) {
