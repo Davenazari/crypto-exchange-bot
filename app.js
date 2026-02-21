@@ -498,7 +498,8 @@ const MAX_LEVERAGE = {
 };
 
 let futuresMode = 'long'; // 'long' | 'short'
-let openPositions = []; // { id, coinId, side, entryPrice, margin, leverage, size, liqPrice, coin }
+let openPositions = [];
+let futuresHistory = [];
 
 // ─── Update leverage slider ───
 function updateLeverageUI() {
@@ -580,6 +581,7 @@ function openFuturesPosition() {
     size: positionSize,
     liqPrice,
     coinAmount: positionSize / entryPrice,
+    openedAt: new Date(),
   };
 
   openPositions.push(pos);
@@ -591,7 +593,7 @@ function openFuturesPosition() {
   showToast(`${futuresMode === 'long' ? '↑ Long' : '↓ Short'} opened: $${positionSize.toLocaleString()} at ${leverage}x`, 'success');
 }
 
-function closePosition(posId) {
+function closePosition(posId, reason = 'manual') {
   const idx = openPositions.findIndex(p => p.id === posId);
   if (idx === -1) return;
   const pos = openPositions[idx];
@@ -604,10 +606,30 @@ function closePosition(posId) {
 
   if (returned > 0) state.portfolio.usdt += returned;
 
+  // Save to history
+  futuresHistory.unshift({
+    ...pos,
+    closePrice: currentPrice,
+    pnl,
+    pnlPct: pnlPct * 100,
+    closedAt: new Date(),
+    reason,
+  });
+
   openPositions.splice(idx, 1);
   renderPositions();
   updatePortfolioValue();
-  showToast(`Position closed. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`, pnl >= 0 ? 'success' : 'error');
+  showToast(
+    reason === 'liquidated'
+      ? `Liquidated! Lost $${pos.margin.toFixed(2)}`
+      : `Closed. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`,
+    pnl >= 0 && reason !== 'liquidated' ? 'success' : 'error'
+  );
+}
+
+function formatDateTime(date) {
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    + ' ' + date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function renderPositions() {
@@ -615,48 +637,81 @@ function renderPositions() {
   const countEl = document.getElementById('positionsCount');
   countEl.textContent = `${openPositions.length} active`;
 
+  // Check liquidations first
+  openPositions.forEach(pos => {
+    const currentPrice = state.prices[pos.coinId]?.usd || pos.entryPrice;
+    const isLiquidated = pos.side === 'long' ? currentPrice <= pos.liqPrice : currentPrice >= pos.liqPrice;
+    if (isLiquidated) closePosition(pos.id, 'liquidated');
+  });
+
   if (!openPositions.length) {
     list.innerHTML = `<p class="empty-state">No open positions</p>`;
-    return;
+  } else {
+    list.innerHTML = openPositions.map(pos => {
+      const currentPrice = state.prices[pos.coinId]?.usd || pos.entryPrice;
+      const priceDiff = currentPrice - pos.entryPrice;
+      const pnlPct = (priceDiff / pos.entryPrice) * pos.leverage;
+      const pnl = pos.margin * (pos.side === 'long' ? pnlPct : -pnlPct);
+      const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+
+      return `
+        <div class="position-card">
+          <div class="position-header">
+            <div class="position-coin">
+              <img src="${pos.coin.img}" style="width:24px;height:24px;border-radius:50%;object-fit:cover" />
+              ${pos.coin.symbol}
+              <span class="position-lev">${pos.leverage}x</span>
+            </div>
+            <span class="position-side ${pos.side}">${pos.side === 'long' ? '↑ Long' : '↓ Short'}</span>
+          </div>
+          <div class="position-pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} <span style="font-size:14px">(${(pnlPct * 100).toFixed(1)}%)</span></div>
+          <div class="position-details" style="margin-top:10px">
+            <div class="pos-detail">Entry Price<span>$${formatPrice(pos.entryPrice)}</span></div>
+            <div class="pos-detail">Current Price<span>$${formatPrice(currentPrice)}</span></div>
+            <div class="pos-detail">Margin<span style="color:#ffaa00">$${pos.margin.toFixed(2)}</span></div>
+            <div class="pos-detail">Position Size<span>$${pos.size.toLocaleString('en-US',{maximumFractionDigits:0})}</span></div>
+            <div class="pos-detail">Liq. Price<span style="color:var(--red)">$${formatPrice(pos.liqPrice)}</span></div>
+            <div class="pos-detail">Opened At<span style="font-size:11px">${formatDateTime(pos.openedAt)}</span></div>
+          </div>
+          <button class="close-pos-btn" onclick="closePosition(${pos.id})">Close Position</button>
+        </div>`;
+    }).join('');
   }
 
-  list.innerHTML = openPositions.map(pos => {
-    const currentPrice = state.prices[pos.coinId]?.usd || pos.entryPrice;
-    const priceDiff = currentPrice - pos.entryPrice;
-    const pnlPct = (priceDiff / pos.entryPrice) * pos.leverage;
-    const pnl = pos.margin * (pos.side === 'long' ? pnlPct : -pnlPct);
-    const pnlClass = pnl >= 0 ? 'profit' : 'loss';
-    const isLiquidated = pos.side === 'long' ? currentPrice <= pos.liqPrice : currentPrice >= pos.liqPrice;
-
-    if (isLiquidated) {
-      setTimeout(() => {
-        openPositions = openPositions.filter(p => p.id !== pos.id);
-        renderPositions();
-        showToast(`Position liquidated! Lost $${pos.margin.toFixed(2)}`, 'error');
-      }, 100);
-      return '';
-    }
-
-    return `
-      <div class="position-card">
-        <div class="position-header">
-          <div class="position-coin">
-            <img src="${pos.coin.img}" style="width:24px;height:24px;border-radius:50%" />
-            ${pos.coin.symbol}
-            <span class="position-lev">${pos.leverage}x</span>
+  // Futures History
+  const histEl = document.getElementById('futuresHistoryList');
+  if (!histEl) return;
+  if (!futuresHistory.length) {
+    histEl.innerHTML = `<p class="empty-state">No closed positions yet</p>`;
+  } else {
+    histEl.innerHTML = futuresHistory.slice(0, 20).map(h => {
+      const pnlClass = h.pnl >= 0 ? 'profit' : 'loss';
+      const isLiq = h.reason === 'liquidated';
+      return `
+        <div class="position-card" style="opacity:0.85">
+          <div class="position-header">
+            <div class="position-coin">
+              <img src="${h.coin.img}" style="width:22px;height:22px;border-radius:50%;object-fit:cover" />
+              ${h.coin.symbol}
+              <span class="position-lev">${h.leverage}x</span>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <span class="position-side ${h.side}">${h.side === 'long' ? '↑ Long' : '↓ Short'}</span>
+              ${isLiq ? '<span style="font-size:10px;color:var(--red);font-weight:700;background:rgba(255,82,82,0.1);padding:2px 8px;border-radius:999px;border:1px solid rgba(255,82,82,0.3)">LIQ</span>' : ''}
+            </div>
           </div>
-          <span class="position-side ${pos.side}">${pos.side === 'long' ? '↑ Long' : '↓ Short'}</span>
-        </div>
-        <div class="position-pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${(pnlPct * 100).toFixed(1)}%)</div>
-        <div class="position-details" style="margin-top:10px">
-          <div class="pos-detail">Entry<span>$${formatPrice(pos.entryPrice)}</span></div>
-          <div class="pos-detail">Current<span>$${formatPrice(currentPrice)}</span></div>
-          <div class="pos-detail">Size<span>$${pos.size.toLocaleString('en-US',{maximumFractionDigits:0})}</span></div>
-          <div class="pos-detail">Liq. Price<span style="color:var(--red)">$${formatPrice(pos.liqPrice)}</span></div>
-        </div>
-        <button class="close-pos-btn" onclick="closePosition(${pos.id})">Close Position</button>
-      </div>`;
-  }).join('');
+          <div class="position-pnl ${pnlClass}" style="font-size:18px">${h.pnl >= 0 ? '+' : ''}$${h.pnl.toFixed(2)} <span style="font-size:13px">(${h.pnlPct.toFixed(1)}%)</span></div>
+          <div class="position-details" style="margin-top:8px">
+            <div class="pos-detail">Entry<span>$${formatPrice(h.entryPrice)}</span></div>
+            <div class="pos-detail">Close<span>$${formatPrice(h.closePrice)}</span></div>
+            <div class="pos-detail">Margin<span style="color:#ffaa00">$${h.margin.toFixed(2)}</span></div>
+            <div class="pos-detail">Size<span>$${h.size.toLocaleString('en-US',{maximumFractionDigits:0})}</span></div>
+            <div class="pos-detail">Opened<span style="font-size:11px">${formatDateTime(h.openedAt)}</span></div>
+            <div class="pos-detail">Closed<span style="font-size:11px">${formatDateTime(h.closedAt)}</span></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
 }
 
 // ─── Futures Event Listeners ───
