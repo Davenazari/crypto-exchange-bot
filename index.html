@@ -181,6 +181,97 @@
         <div id="txList"><p class="empty-state">No transactions yet</p></div>
       </section>
 
+      <!-- FUTURES -->
+      <section class="page" id="page-futures">
+        <div class="page-header">
+          <h2>Futures</h2>
+          <span class="futures-badge">Up to 125x</span>
+        </div>
+
+        <div class="glass-card futures-card">
+
+          <!-- Long / Short toggle -->
+          <div class="trade-toggle">
+            <button class="toggle-btn buy-active" id="longBtn">↑ Long</button>
+            <button class="toggle-btn" id="shortBtn">↓ Short</button>
+          </div>
+
+          <!-- Asset -->
+          <div class="field-group">
+            <label class="field-label">Asset</label>
+            <select id="futuresCoin" class="glass-input select-input">
+              <option value="bitcoin">Bitcoin (BTC)</option>
+              <option value="ethereum">Ethereum (ETH)</option>
+              <option value="binancecoin">BNB (BNB)</option>
+              <option value="solana">Solana (SOL)</option>
+              <option value="ripple">XRP (XRP)</option>
+              <option value="cardano">Cardano (ADA)</option>
+              <option value="avalanche-2">Avalanche (AVAX)</option>
+              <option value="chainlink">Chainlink (LINK)</option>
+              <option value="polkadot">Polkadot (DOT)</option>
+              <option value="tron">TRON (TRX)</option>
+              <option value="sui">Sui (SUI)</option>
+              <option value="dogecoin">Dogecoin (DOGE)</option>
+              <option value="shiba-inu">Shiba Inu (SHIB)</option>
+              <option value="pepe">Pepe (PEPE)</option>
+              <option value="bonk">Bonk (BONK)</option>
+              <option value="dogwifcoin">dogwifhat (WIF)</option>
+              <option value="floki">FLOKI (FLOKI)</option>
+              <option value="cat-in-a-dogs-world">MEW (MEW)</option>
+              <option value="brett-based">Brett (BRETT)</option>
+            </select>
+          </div>
+
+          <!-- Leverage slider -->
+          <div class="field-group">
+            <div class="leverage-header">
+              <label class="field-label">Leverage</label>
+              <span class="leverage-value" id="leverageValue">10x</span>
+            </div>
+            <input type="range" id="leverageSlider" class="leverage-slider" min="1" max="125" value="10" step="1" />
+            <div class="leverage-presets" id="leveragePresets">
+              <button class="lev-preset" data-lev="5">5x</button>
+              <button class="lev-preset" data-lev="10">10x</button>
+              <button class="lev-preset" data-lev="25">25x</button>
+              <button class="lev-preset" data-lev="50">50x</button>
+              <button class="lev-preset" data-lev="100">100x</button>
+            </div>
+          </div>
+
+          <!-- Margin (USDT) -->
+          <div class="field-group">
+            <label class="field-label">Margin (USDT)</label>
+            <div class="amount-wrap">
+              <input class="glass-input amount-input" type="number" id="futuresMargin" placeholder="0.00" />
+              <span class="amount-tag">USDT</span>
+            </div>
+            <div class="quick-row">
+              <button class="quick-chip" data-famt="100">$100</button>
+              <button class="quick-chip" data-famt="500">$500</button>
+              <button class="quick-chip" data-famt="1000">$1K</button>
+              <button class="quick-chip" data-famt="2000">$2K</button>
+            </div>
+          </div>
+
+          <!-- Order info -->
+          <div class="info-glass">
+            <div class="info-row"><span>Entry Price</span><span id="fEntryPrice" class="mono">—</span></div>
+            <div class="info-row"><span>Position Size</span><span id="fPositionSize" class="mono">—</span></div>
+            <div class="info-row"><span>Liq. Price (est.)</span><span id="fLiqPrice" class="mono">—</span></div>
+            <div class="info-row"><span>Fee (0.05%)</span><span id="fFee" class="mono">—</span></div>
+          </div>
+
+          <button class="cta-btn buy-cta" id="futuresBtn">Open Long Position</button>
+        </div>
+
+        <!-- Open Positions -->
+        <div class="section-title" style="margin-top:20px">
+          <span>Open Positions</span>
+          <span id="positionsCount" class="pill-label">0 active</span>
+        </div>
+        <div id="positionsList"><p class="empty-state">No open positions</p></div>
+      </section>
+
     </main>
 
     <!-- Bottom Nav -->
@@ -196,6 +287,10 @@
       <button class="nav-btn" data-page="trade">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         <span>Trade</span>
+      </button>
+      <button class="nav-btn" data-page="futures">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span>Futures</span>
       </button>
       <button class="nav-btn" data-page="wallet">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>

@@ -483,3 +483,239 @@ document.querySelectorAll('.quick-chip').forEach(btn => {
 
 // ─── Init ───
 fetchInitialPrices().then(() => connectWebSocket());
+
+// ============================================
+// FUTURES MODULE
+// ============================================
+
+// Max leverage per coin
+const MAX_LEVERAGE = {
+  bitcoin: 125, ethereum: 125,
+  binancecoin: 75, solana: 75, ripple: 75,
+  cardano: 50, 'avalanche-2': 50, chainlink: 50, polkadot: 50, tron: 50, sui: 50,
+  dogecoin: 25, 'shiba-inu': 25, pepe: 25, bonk: 25, dogwifcoin: 25,
+  floki: 25, 'cat-in-a-dogs-world': 25, 'brett-based': 25,
+};
+
+let futuresMode = 'long'; // 'long' | 'short'
+let openPositions = []; // { id, coinId, side, entryPrice, margin, leverage, size, liqPrice, coin }
+
+// ─── Update leverage slider ───
+function updateLeverageUI() {
+  const coinId = document.getElementById('futuresCoin').value;
+  const maxLev = MAX_LEVERAGE[coinId] || 25;
+  const slider = document.getElementById('leverageSlider');
+  const current = Math.min(parseInt(slider.value), maxLev);
+
+  slider.max = maxLev;
+  slider.value = current;
+
+  // Update gradient fill
+  const pct = ((current - 1) / (maxLev - 1)) * 100;
+  slider.style.setProperty('--pct', pct + '%');
+
+  document.getElementById('leverageValue').textContent = current + 'x';
+
+  // Update preset buttons - hide any > maxLev
+  document.querySelectorAll('.lev-preset').forEach(btn => {
+    const lev = parseInt(btn.dataset.lev);
+    btn.style.opacity = lev > maxLev ? '0.3' : '1';
+    btn.style.pointerEvents = lev > maxLev ? 'none' : 'auto';
+    btn.classList.toggle('active', lev === current);
+  });
+
+  updateFuturesInfo();
+}
+
+function updateFuturesInfo() {
+  const coinId = document.getElementById('futuresCoin').value;
+  const margin = parseFloat(document.getElementById('futuresMargin').value) || 0;
+  const leverage = parseInt(document.getElementById('leverageSlider').value);
+  const p = state.prices[coinId];
+
+  if (!p || !margin) {
+    ['fEntryPrice','fPositionSize','fLiqPrice','fFee'].forEach(id => document.getElementById(id).textContent = '—');
+    return;
+  }
+
+  const entryPrice = p.usd;
+  const positionSize = margin * leverage;
+  const fee = positionSize * 0.0005;
+  // Liq price: for long = entry * (1 - 1/leverage * 0.9), for short = entry * (1 + 1/leverage * 0.9)
+  const liqPrice = futuresMode === 'long'
+    ? entryPrice * (1 - 0.9 / leverage)
+    : entryPrice * (1 + 0.9 / leverage);
+
+  const coin = COINS.find(c => c.id === coinId);
+  document.getElementById('fEntryPrice').textContent = `$${formatPrice(entryPrice)}`;
+  document.getElementById('fPositionSize').textContent = `$${positionSize.toLocaleString('en-US', {maximumFractionDigits:2})}`;
+  document.getElementById('fLiqPrice').textContent = `$${formatPrice(liqPrice)}`;
+  document.getElementById('fFee').textContent = `$${fee.toFixed(4)}`;
+}
+
+function openFuturesPosition() {
+  const coinId = document.getElementById('futuresCoin').value;
+  const margin = parseFloat(document.getElementById('futuresMargin').value);
+  const leverage = parseInt(document.getElementById('leverageSlider').value);
+  const p = state.prices[coinId];
+  const coin = COINS.find(c => c.id === coinId);
+
+  if (!margin || margin <= 0) return showToast('Enter a margin amount', 'error');
+  if (!p) return showToast('Price unavailable', 'error');
+  if (margin > state.portfolio.usdt) return showToast('Insufficient USDT balance', 'error');
+
+  const entryPrice = p.usd;
+  const positionSize = margin * leverage;
+  const fee = positionSize * 0.0005;
+  const liqPrice = futuresMode === 'long'
+    ? entryPrice * (1 - 0.9 / leverage)
+    : entryPrice * (1 + 0.9 / leverage);
+
+  state.portfolio.usdt -= (margin + fee);
+
+  const pos = {
+    id: Date.now(),
+    coinId, coin, side: futuresMode,
+    entryPrice, margin, leverage,
+    size: positionSize,
+    liqPrice,
+    coinAmount: positionSize / entryPrice,
+  };
+
+  openPositions.push(pos);
+
+  document.getElementById('futuresMargin').value = '';
+  updateFuturesInfo();
+  updatePortfolioValue();
+  renderPositions();
+  showToast(`${futuresMode === 'long' ? '↑ Long' : '↓ Short'} opened: $${positionSize.toLocaleString()} at ${leverage}x`, 'success');
+}
+
+function closePosition(posId) {
+  const idx = openPositions.findIndex(p => p.id === posId);
+  if (idx === -1) return;
+  const pos = openPositions[idx];
+  const currentPrice = state.prices[pos.coinId]?.usd || pos.entryPrice;
+
+  const priceDiff = currentPrice - pos.entryPrice;
+  const pnlPct = (priceDiff / pos.entryPrice) * pos.leverage;
+  const pnl = pos.margin * (pos.side === 'long' ? pnlPct : -pnlPct);
+  const returned = pos.margin + pnl;
+
+  if (returned > 0) state.portfolio.usdt += returned;
+
+  openPositions.splice(idx, 1);
+  renderPositions();
+  updatePortfolioValue();
+  showToast(`Position closed. PnL: ${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}`, pnl >= 0 ? 'success' : 'error');
+}
+
+function renderPositions() {
+  const list = document.getElementById('positionsList');
+  const countEl = document.getElementById('positionsCount');
+  countEl.textContent = `${openPositions.length} active`;
+
+  if (!openPositions.length) {
+    list.innerHTML = `<p class="empty-state">No open positions</p>`;
+    return;
+  }
+
+  list.innerHTML = openPositions.map(pos => {
+    const currentPrice = state.prices[pos.coinId]?.usd || pos.entryPrice;
+    const priceDiff = currentPrice - pos.entryPrice;
+    const pnlPct = (priceDiff / pos.entryPrice) * pos.leverage;
+    const pnl = pos.margin * (pos.side === 'long' ? pnlPct : -pnlPct);
+    const pnlClass = pnl >= 0 ? 'profit' : 'loss';
+    const isLiquidated = pos.side === 'long' ? currentPrice <= pos.liqPrice : currentPrice >= pos.liqPrice;
+
+    if (isLiquidated) {
+      setTimeout(() => {
+        openPositions = openPositions.filter(p => p.id !== pos.id);
+        renderPositions();
+        showToast(`Position liquidated! Lost $${pos.margin.toFixed(2)}`, 'error');
+      }, 100);
+      return '';
+    }
+
+    return `
+      <div class="position-card">
+        <div class="position-header">
+          <div class="position-coin">
+            <img src="${pos.coin.img}" style="width:24px;height:24px;border-radius:50%" />
+            ${pos.coin.symbol}
+            <span class="position-lev">${pos.leverage}x</span>
+          </div>
+          <span class="position-side ${pos.side}">${pos.side === 'long' ? '↑ Long' : '↓ Short'}</span>
+        </div>
+        <div class="position-pnl ${pnlClass}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)} (${(pnlPct * 100).toFixed(1)}%)</div>
+        <div class="position-details" style="margin-top:10px">
+          <div class="pos-detail">Entry<span>$${formatPrice(pos.entryPrice)}</span></div>
+          <div class="pos-detail">Current<span>$${formatPrice(currentPrice)}</span></div>
+          <div class="pos-detail">Size<span>$${pos.size.toLocaleString('en-US',{maximumFractionDigits:0})}</span></div>
+          <div class="pos-detail">Liq. Price<span style="color:var(--red)">$${formatPrice(pos.liqPrice)}</span></div>
+        </div>
+        <button class="close-pos-btn" onclick="closePosition(${pos.id})">Close Position</button>
+      </div>`;
+  }).join('');
+}
+
+// ─── Futures Event Listeners ───
+document.getElementById('longBtn').addEventListener('click', () => {
+  futuresMode = 'long';
+  document.getElementById('longBtn').className = 'toggle-btn buy-active';
+  document.getElementById('shortBtn').className = 'toggle-btn';
+  document.getElementById('futuresBtn').textContent = 'Open Long Position';
+  document.getElementById('futuresBtn').className = 'cta-btn buy-cta';
+  updateFuturesInfo();
+});
+
+document.getElementById('shortBtn').addEventListener('click', () => {
+  futuresMode = 'short';
+  document.getElementById('shortBtn').className = 'toggle-btn sell-active';
+  document.getElementById('longBtn').className = 'toggle-btn';
+  document.getElementById('futuresBtn').textContent = 'Open Short Position';
+  document.getElementById('futuresBtn').className = 'cta-btn sell-cta';
+  updateFuturesInfo();
+});
+
+document.getElementById('futuresCoin').addEventListener('change', updateLeverageUI);
+document.getElementById('futuresMargin').addEventListener('input', updateFuturesInfo);
+document.getElementById('futuresBtn').addEventListener('click', openFuturesPosition);
+
+document.getElementById('leverageSlider').addEventListener('input', () => {
+  const slider = document.getElementById('leverageSlider');
+  const maxLev = parseInt(slider.max);
+  const val = parseInt(slider.value);
+  const pct = ((val - 1) / (maxLev - 1)) * 100;
+  slider.style.setProperty('--pct', pct + '%');
+  document.getElementById('leverageValue').textContent = val + 'x';
+  document.querySelectorAll('.lev-preset').forEach(b => b.classList.toggle('active', parseInt(b.dataset.lev) === val));
+  updateFuturesInfo();
+});
+
+document.querySelectorAll('.lev-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const lev = parseInt(btn.dataset.lev);
+    const slider = document.getElementById('leverageSlider');
+    const maxLev = parseInt(slider.max);
+    if (lev > maxLev) return;
+    slider.value = lev;
+    const pct = ((lev - 1) / (maxLev - 1)) * 100;
+    slider.style.setProperty('--pct', pct + '%');
+    document.getElementById('leverageValue').textContent = lev + 'x';
+    document.querySelectorAll('.lev-preset').forEach(b => b.classList.toggle('active', parseInt(b.dataset.lev) === lev));
+    updateFuturesInfo();
+  });
+});
+
+document.querySelectorAll('[data-famt]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('futuresMargin').value = btn.dataset.famt;
+    updateFuturesInfo();
+  });
+});
+
+// Update open positions PnL every second
+setInterval(() => {
+  if (openPositions.length > 0) renderPositions();
+}, 1000);
